@@ -1,91 +1,54 @@
 #!/bin/bash +xe
-REPO_NAME=`pushd ${WORKSPACE}/build >/dev/null && git remote show origin -n | grep "Fetch URL:" | sed "s#^.*/\(.*\).git#\1#" && popd > /dev/null`
-if [ -e "${REPO_NAME}/sonar.properties.in" ]; then
-  echo "Generating sonar.properties file from template"
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat ${REPO_NAME}/sonar.properties.in | sed -f sed.script > sonar.properties
-  rm sed.script
+
+ON_BUILD_CONFIG_DIR=$(cd "$(dirname "$0")"; pwd)
+
+if [ "$#" -ne "1" ];
+then
+    echo "usage: $0 <target_directory_of_rackhd_repo_code>"
+    exit 2
+fi  
+REPO_DIR=$1
+
+if [ ! -d "$REPO_DIR" ];
+then 
+    echo "Error:  argument [$REPO_DIR] is not a directory"
+    exit 1
 fi
 
-echo "Generating post-result.py file from template"
-env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-cat post-result.py.in | sed -f sed.script > post-result.py
-chmod oug+x post-result.py
-rm sed.script
+REPO_NAME=`pushd ${REPO_DIR} >/dev/null && git remote show origin -n | grep "Fetch URL:" | sed "s#^.*/\(.*\).git#\1#" && popd > /dev/null`
+TEMPLATE_DIR=${ON_BUILD_CONFIG_DIR}/${REPO_NAME}
 
-echo "Generating test script file from template"
-if [ -e "${REPO_NAME}/test.sh.in" ]; then
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat ${REPO_NAME}/test.sh.in | sed -f sed.script > test.sh
-  chmod oug+x test.sh
-  rm sed.script
-else
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat test.sh.in | sed -f sed.script > test.sh
-  chmod oug+x test.sh
-  rm sed.script
-fi
+FILE_LIST=( sonar.properties   pre-deploy.sh  post-deploy.sh post-result.py    test.sh  unit-test.sh  .nvmrc  )
 
-echo "Generating unit-test script file from template"
-if [ -e "${REPO_NAME}/unit-test.sh.in" ]; then
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat ${REPO_NAME}/unit-test.sh.in | sed -f sed.script > unit-test.sh
-  chmod oug+x unit-test.sh
-  rm sed.script
-else
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat unit-test.sh.in | sed -f sed.script > unit-test.sh
-  chmod oug+x unit-test.sh
-  rm sed.script
-fi
+for FILE in ${FILE_LIST[*]}
+do
+    echo "Generating ${FILE} file from template"
+    # dump ENV into a file, will replace template(.in files) with ENV placeholders
+    env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
 
-echo "Generating pre deployment file from template"
-if [ -e "${REPO_NAME}/pre-deploy.sh.in" ]; then
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat ${REPO_NAME}/pre-deploy.sh.in | sed -f sed.script > pre-deploy.sh
-  chmod oug+x pre-deploy.sh
-  rm sed.script
-else
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat pre-deploy.sh.in | sed -f sed.script > pre-deploy.sh
-  chmod oug+x pre-deploy.sh
-  rm sed.script
-fi
+    # use .in file in TEMPLATE_DIR first
+    if [ -e "${TEMPLATE_DIR}/${FILE}.in" ]; then
+          cat ${TEMPLATE_DIR}/${FILE}.in | sed -f sed.script > ${REPO_DIR}/${FILE}
+    else
+          # else , use common .in file
+          cat ${ON_BUILD_CONFIG_DIR}/${FILE}.in | sed -f sed.script > ${REPO_DIR}/${FILE}
+    fi
+    chmod oug+x ${REPO_DIR}/${FILE} 
+    rm sed.script
+done
 
-echo "Generating post deployment file from template"
-if [ -e "${REPO_NAME}/post-deploy.sh.in" ]; then
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat ${REPO_NAME}/post-deploy.sh.in | sed -f sed.script > post-deploy.sh
-  chmod oug+x post-deploy.sh
-  rm sed.script
-else
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat post-deploy.sh.in | sed -f sed.script > post-deploy.sh
-  chmod oug+x post-deploy.sh
-  rm sed.script
-fi
-
-echo "Generating nvmrc file from template"
-if [ -e "${REPO_NAME}/.nvmrc.in" ]; then
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat ${REPO_NAME}/.nvmrc.in | sed -f sed.script > .nvmrc
-  rm sed.script
-else
-  env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
-  cat .nvmrc.in | sed -f sed.script > .nvmrc
-  rm sed.script
-fi
 
 FORKURL=${FORKURL-https://github.com/RackHD/on-core.git}
+echo "Update the package.json, to reflect the dependency to target commit : ${FORKURL} : ${COMMIT}"
 if [ "${FORKURL}" != "https://github.com/RackHD/on-core.git" ]; then
   if [ -e "../build/package.json" ]; then
-    sed -i "s|"git+https://github.com/RackHD/on-core.git"|"git+${FORKURL}"|" ../build/package.json
+    sed -i "s|"git+https://github.com/RackHD/on-core.git"|"git+${FORKURL}"|" ${REPO_DIR}/package.json
   fi
 fi
 
 if [ ! -z "${COMMIT}" ]; then
   if [ -e "../build/package.json" ]; then
-    sed -i "s|"git+${FORKURL}"|"git+${FORKURL}#${COMMIT}"|" ../build/package.json
+    sed -i "s|"git+${FORKURL}"|"git+${FORKURL}#${COMMIT}"|" ${REPO_DIR}/package.json
   fi
 fi
 
