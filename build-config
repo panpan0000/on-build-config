@@ -24,7 +24,7 @@ for FILE in ${FILE_LIST[*]}
 do
     echo "Generating ${FILE} file from template"
     # dump ENV into a file, will replace template(.in files) with ENV placeholders
-    env | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
+    env REPO_NAME=${REPO_NAME} | sed 's/[\%]/\\&/g;s/\([^=]*\)=\(.*\)/s%${\1}%\2%/' > sed.script
 
     # use .in file in TEMPLATE_DIR first
     if [ -e "${TEMPLATE_DIR}/${FILE}.in" ]; then

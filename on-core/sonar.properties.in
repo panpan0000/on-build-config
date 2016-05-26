@@ -1,21 +1,21 @@
 #Create sonar.properties file
 
 # Required metadata
-sonar.projectKey=on-core
-sonar.projectName=on-core
+sonar.projectKey=${REPO_NAME}
+sonar.projectName=${REPO_NAME}
 sonar.projectVersion=1.0
 sonar.scm.enabled=false
 
 # Comma-separated paths to directories with sources (required)
-sonar.sources=build/lib
-sonar.tests=build/spec
+sonar.sources=lib
+sonar.tests=spec
 
 # Language
 sonar.language=js
 sonar.profile=node
 
 sonar.javascript.jstestdriver.reportsPath=xunit-reports
-sonar.javascript.lcov.reportPath=build/coverage/lcov.info
+sonar.javascript.lcov.reportPath=coverage/lcov.info
 
 # Encoding of the source files
 sonar.sourceEncoding=UTF-8
