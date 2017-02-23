@@ -14,6 +14,12 @@ OVA="$PACKERDIR/rackhd-${OS_VER}-${RACKHD_VERSION}.ova"
 
 echo "Post Test starts "
 
+
+cd $PACKERDIR
+echo "add IP property to this OVA."
+./add_IP_property_to_ova.sh rackhd-${OS_VER}-${RACKHD_VERSION}.ova
+cd -
+
 bash ./build-config/build-release-tools/post_test.sh \
 --type ova \
 --adminIP ${OVA_Admin_IP} \
