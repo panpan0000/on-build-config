@@ -1,18 +1,9 @@
 #!/bin/bash +xe
-delete_ova() {
-    ansible esxi -a "./vm_operation.sh -a delete ${ESXI_HOST_IP} 1 ova-for-post-test"
-    if [ $? = 0 ]; then
-      echo "Delete ova-for-post-test successfully!"
-    fi
-}
-echo "Delete old OVA"
-delete_ova
-sleep 10
 
-PACKERDIR="$WORKSPACE/build/packer/"
-OVA="$PACKERDIR/rackhd-${OS_VER}-${RACKHD_VERSION}.ova"
+PACKERDIR="${WORKSPACE}/build/packer/"
+OVA="${PACKERDIR}/rackhd-${OS_VER}-${RACKHD_VERSION}.ova"
 
-echo "Post Test starts "
+echo "Post Test starts : OVA File is $OVA"
 
 bash ./build-config/build-release-tools/post_test.sh \
 --type ova \
@@ -29,5 +20,5 @@ bash ./build-config/build-release-tools/post_test.sh \
 --esxiHost ${ESXI_HOST_IP} \
 --esxiHostUser ${ESXI_USER} \
 --esxiHostPass ${ESXI_PASS} \
---net "ADMIN"="External Connection" \
+--net "ADMIN"="Admin" \
 --rackhdVersion $RACKHD_VERSION
