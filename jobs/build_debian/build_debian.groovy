@@ -6,9 +6,9 @@ node(build_debian_node){
                 "IS_OFFICIAL_RELEASE=${env.IS_OFFICIAL_RELEASE}",
                 "BINTRAY_SUBJECT=${env.BINTRAY_SUBJECT}",
                 "BINTRAY_REPO=debian",
-                "CI_BINTRAY_SUBJECT=rackhd-mirror",
+                "CI_BINTRAY_SUBJECT=rackhd",
                 "CI_BINTRAY_REPO=debian",
-                "BINTRAY_COMPONENT=main",
+                "BINTRAY_COMPONENT=stage,
                 "BINTRAY_DISTRIBUTION=trusty", 
                 "BINTRAY_ARCHITECTURE=amd64"]) {
                 deleteDir()

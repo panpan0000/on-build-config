@@ -7,9 +7,9 @@ node(build_vagrant_node){
                 "IS_OFFICIAL_RELEASE=${env.IS_OFFICIAL_RELEASE}",
                 "OS_VER=${env.OS_VER}",
                 "BUILD_TYPE=virtualbox", 
-                "BINTRAY_SUBJECT=rackhd-mirror", 
+                "BINTRAY_SUBJECT=rackhd", 
                 "CI_BINTRAY_REPO=debian", 
-                "BINTRAY_COMPONENT=main", 
+                "BINTRAY_COMPONENT=stage", 
                 "BINTRAY_DISTRIBUTION=trusty", 
                 "BINTRAY_ARCHITECTURE=amd64"]){
                 def current_workspace = pwd()
