@@ -6,14 +6,10 @@ node(build_ova_node){ws{
                 "RACKHD_VERSION=${env.RACKHD_VERSION}",
                 "IS_OFFICIAL_RELEASE=${env.IS_OFFICIAL_RELEASE}",
                 "OS_VER=${env.OS_VER}",
-                "BUILD_TYPE=vmware", 
-                "BINTRAY_SUBJECT=${env.BINTRAY_SUBJECT}",
-                "BINTRAY_REPO=debian",
-                "CI_BINTRAY_SUBJECT=${env.CI_BINTRAY_SUBJECT}",
-                "CI_BINTRAY_REPO=debian", 
-                "BINTRAY_COMPONENT=main", 
-                "BINTRAY_DISTRIBUTION=trusty", 
-                "BINTRAY_ARCHITECTURE=amd64"]){
+                "BUILD_TYPE=vmware",
+                "STAGE_REPO_NAME=${env.STAGE_REPO_NAME}",
+                "DEB_COMPONENT=${env.DEB_COMPONENT}",
+                "DEB_DISTRIBUTION=trusy"]) { 
                 def current_workspace = pwd()
                 deleteDir()
                 def shareMethod
@@ -26,9 +22,12 @@ node(build_ova_node){ws{
                 def targetDir = "build"
                 shareMethod.checkout(url, branch, targetDir)
 
-                timeout(180){
-                    withEnv(["WORKSPACE=${current_workspace}"]){
-                        sh './Build_OVA_JFiles/jobs/build_ova/build_ova.sh'
+                withCredentials([file(credentialsId: 'emcsslchain.crt', variable: 'EMCSSLCHAIN'), file(credentialsId: 'emcssl.crt', variable: 'EMCSSL')]) 
+                {
+                    timeout(180){
+                        withEnv(["WORKSPACE=${current_workspace}"]){
+                            sh './Build_OVA_JFiles/jobs/build_ova/build_ova.sh'
+                        }
                     }
                 }
                 archiveArtifacts 'build/packer/*.ova, build/packer/*.log, build/packer/*.md5, build/packer/*.sha'

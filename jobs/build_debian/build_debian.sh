@@ -16,13 +16,14 @@ curl --user $BINTRAY_CREDS -L "$MANIFEST_FILE_URL" -o rackhd-manifest
 --bintray-repo $BINTRAY_REPO
 
 
-./on-build-config/build-release-tools/HWIMO-BUILD on-build-config/build-release-tools/application/release_debian_packages.py \
+./on-build-config/build-release-tools/HWIMO-BUILD on-build-config/build-release-tools/application/upload_staging_deb_to_artifactory.py \
 --build-directory b/ \
---bintray-credential BINTRAY_CREDS \
---bintray-subject $CI_BINTRAY_SUBJECT \
---bintray-repo $CI_BINTRAY_REPO \
---bintray-component $BINTRAY_COMPONENT \
---bintray-distribution $BINTRAY_DISTRIBUTION \
---bintray-architecture $BINTRAY_ARCHITECTURE
+--artifactory-repo $STAGE_REPO_NAME \
+--artifactory-username $ARTIFACTORY_USR \
+--artifactory-password $ARTIFACTORY_PWD \
+--deb-distribution $DEB_DISTRIBUTION \
+--deb-component  $DEB_COMPONENT \
+--deb-architecture $DEB_ARCHITECTURE
+
 
 popd
