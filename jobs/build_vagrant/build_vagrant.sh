@@ -1,13 +1,28 @@
 #!/bin/bash
-ifconfig
 set +e
-packer -v
+ifconfig
+
+packer -v  # $? of "packer -v" is 1 ...
 vagrant -v
+set -e
+
+ARTIFACTORY_URL=http://afeossand1.cec.lab.emc.com/artifactory
+echo "Modify rackhd-builds ansible role to redirect to Artifactory.."
 
 cd $WORKSPACE/build/packer/ansible/roles/rackhd-builds/tasks
-sed -i "s#https://dl.bintray.com/rackhd/debian trusty release#https://dl.bintray.com/$CI_BINTRAY_SUBJECT/debian trusty main#" main.yml
-sed -i "s#https://dl.bintray.com/rackhd/debian trusty main#https://dl.bintray.com/$CI_BINTRAY_SUBJECT/debian trusty main#" main.yml
+sed -i "s#https://dl.bintray.com/rackhd/debian trusty release#${ARTIFACTORY_URL}/${STAGE_REPO_NAME} ${DEB_DISTRIBUTION} ${DEB_COMPONENT}#" main.yml
+sed -i "s#https://dl.bintray.com/rackhd/debian trusty main#${ARTIFACTORY_URL}/${STAGE_REPO_NAME} ${DEB_DISTRIBUTION} ${DEB_COMPONENT}#" main.yml
+cd $WORKSPACE
+
+
+echo "kill previous running packer instances"
+
+set +e
 pkill packer
+set -e
+
+echo "Start to packer build .."
+
 cd ..
 cd $WORKSPACE/build/packer 
 #export vars to build virtualbox

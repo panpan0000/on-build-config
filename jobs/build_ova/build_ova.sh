@@ -1,16 +1,27 @@
 #!/bin/bash
-set +e
+
 #sudo cp ${HOME}/bin/packer   /usr/bin
 #sudo apt-get install -y  jq
 
 cd $WORKSPACE/build/packer/ansible/roles/rackhd-builds/tasks
-sed -i "s#https://dl.bintray.com/rackhd/debian trusty release#https://dl.bintray.com/$CI_BINTRAY_SUBJECT/debian trusty main#" main.yml
-sed -i "s#https://dl.bintray.com/rackhd/debian trusty main#https://dl.bintray.com/$CI_BINTRAY_SUBJECT/debian trusty main#" main.yml
+ARTIFACTORY_URL=http://afeossand1.cec.lab.emc.com/artifactory
+
+cd $WORKSPACE/build/packer/ansible/roles/rackhd-builds/tasks
+sed -i "s#https://dl.bintray.com/rackhd/debian trusty release#${ARTIFACTORY_URL}/${STAGE_REPO_NAME} ${DEB_DISTRIBUTION} ${DEB_COMPONENT}#" main.yml
+sed -i "s#https://dl.bintray.com/rackhd/debian trusty main#${ARTIFACTORY_URL}/${STAGE_REPO_NAME} ${DEB_DISTRIBUTION} ${DEB_COMPONENT}#" main.yml
+cd $WORKSPACE
+
+echo "kill previous running packer instances"
+
+set +e
 cd ..
 pkill packer
 pkill vmware
+set -e
 set -x
 cd $WORKSPACE/build/packer 
+echo "Start to packer build .."
+
 export PACKER_CACHE_DIR=$HOME/.packer_cache
 export BUILD_TYPE=vmware
 #export vars to build ova

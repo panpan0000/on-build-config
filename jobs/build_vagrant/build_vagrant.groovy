@@ -7,13 +7,9 @@ node(build_vagrant_node){
                 "IS_OFFICIAL_RELEASE=${env.IS_OFFICIAL_RELEASE}",
                 "OS_VER=${env.OS_VER}",
                 "BUILD_TYPE=virtualbox",
-                "BINTRAY_SUBJECT=${env.BINTRAY_SUBJECT}",
-                "BINTRAY_REPO=debian",
-                "CI_BINTRAY_SUBJECT=${env.CI_BINTRAY_SUBJECT}",
-                "CI_BINTRAY_REPO=debian",
-                "BINTRAY_COMPONENT=main", 
-                "BINTRAY_DISTRIBUTION=trusty", 
-                "BINTRAY_ARCHITECTURE=amd64"]){
+                "STAGE_REPO_NAME=${env.STAGE_REPO_NAME}",
+                "DEB_COMPONENT=${env.DEB_COMPONENT}",
+                "DEB_DISTRIBUTION=trusty"]){
                 def current_workspace = pwd()
                 deleteDir()
                 def shareMethod
@@ -25,7 +21,8 @@ node(build_vagrant_node){
                 def branch = "${env.RACKHD_COMMIT}"
                 def targetDir = "build"
                 shareMethod.checkout(url, branch, targetDir)
-                
+ 
+ 
                 timeout(180){
                     withEnv(["WORKSPACE=${current_workspace}"]){
                         sh './Build_Vagrant_JFiles/jobs/build_vagrant/build_vagrant.sh'
