@@ -1,5 +1,5 @@
 #!/bin/bash
-set +e
+
 #sudo cp ${HOME}/bin/packer   /usr/bin
 #sudo apt-get install -y  jq
 
@@ -39,9 +39,11 @@ EOF
 
 
 
+set +e
 cd ..
 pkill packer
 pkill vmware
+set -e
 set -x
 cd $WORKSPACE/build/packer 
 export PACKER_CACHE_DIR=$HOME/.packer_cache

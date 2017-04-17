@@ -1,6 +1,7 @@
 #!/bin/bash
+set -e
 ifconfig
-set +e
+
 packer -v
 vagrant -v
 
@@ -40,8 +41,10 @@ EOF
 
 
 
-
+set +e
 pkill packer
+set -e
+
 cd ..
 cd $WORKSPACE/build/packer 
 #export vars to build virtualbox
