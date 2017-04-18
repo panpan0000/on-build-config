@@ -17,7 +17,12 @@ node(build_debian_node){
                 withCredentials([
                     usernamePassword(credentialsId: 'MN_ARTIFACTORY_CRED',
                                      passwordVariable: 'ARTIFACTORY_PWD',
-                                     usernameVariable: 'ARTIFACTORY_USR')])
+                                     usernameVariable: 'ARTIFACTORY_USR'),
+                    usernameColonPassword(credentialsId: "ff7ab8d2-e678-41ef-a46b-dd0e780030e1", 
+                                          variable: "SUDO_CREDS"),
+                    usernameColonPassword(credentialsId: "BINTRAY_CREDS", 
+                                          variable:"BINTRAY_CREDS")
+                                 ])
                 {
                     sh './on-build-config/jobs/build_debian/build_debian.sh'
                 }
