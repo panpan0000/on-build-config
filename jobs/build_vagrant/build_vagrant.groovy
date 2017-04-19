@@ -9,7 +9,7 @@ node(build_vagrant_node){
                 "BUILD_TYPE=virtualbox",
                 "STAGE_REPO_NAME=${env.STAGE_REPO_NAME}",
                 "DEB_COMPONENT=${env.DEB_COMPONENT}",
-                "DEB_DISTRIBUTION=trusy"]){
+                "DEB_DISTRIBUTION=trusty"]){
                 def current_workspace = pwd()
                 deleteDir()
                 def shareMethod

@@ -11,19 +11,24 @@ cd $WORKSPACE
 # Modify the default "apt-get update" ansible role as below
 # to ensure the node can access the EMC Artifactory
 # "apt" is the first step of the ansible roles
-cat > $WORKSPACE/packer/ansible/roles/apt/tasks/main.yml  << EOF
+cat > $WORKSPACE/build/packer/ansible/roles/apt/tasks/main.yml  << EOF
 ---
-- name: Create /usr/local/share/ca-certificates
-  shell: mkdir -p /usr/local/share/ca-certificates
 
-- name: Create emcssl.crt
-  shell: cat EMCSSL      /usr/local/share/ca-certificates/emcssl.crt
+- name: Create directory for ca certificates /usr/local/share/ca-certificates
+  file: path=/usr/local/share/ca-certificates  state=directory mode=0777
+  sudo: yes
 
-- name: Create emcsslchain.crt
-  shell: cat EMCSSLCHAIN /usr/local/share/ca-certificates/emcsslchain.crt
+- name: Copy EMC SSL files  /usr/local/share/ca-certificates/emcssl.crt
+  copy: src=$EMCSSL dest=/usr/local/share/ca-certificates/emcssl.crt
+  sudo: yes
+
+- name: Copy EMC SSL Chain files /usr/local/share/ca-certificates/emcsslchain.crt
+  copy: src=$EMCSSLCHAIN dest=/usr/local/share/ca-certificates/emcsslchain.crt
+  sudo: yes
 
 - name: Update CA certificates 
-  shell: sudo /usr/sbin/update-ca-certificates -v
+  shell: /usr/sbin/update-ca-certificates -v
+  sudo: yes
 
 - name: Update apt
   apt: update-cache=yes
@@ -32,9 +37,11 @@ EOF
 
 #Remove EMC CA from the ova/vagrant
 # "rackhd-builds" is the last step of the ansible roles
-cat >> $WORKSPACE/packer/ansible/roles/rackhd-builds/tasks/main.yml << EOF
+echo "" >> $WORKSPACE/build/packer/ansible/roles/rackhd-builds/tasks/main.yml # a new line
+cat >> $WORKSPACE/build/packer/ansible/roles/rackhd-builds/tasks/main.yml << EOF
 - name: Remove EMC CA
   shell: rm -f /usr/local/share/ca-certificates/*    ||     rm -f /etc/ssl/certs/emc*
+  sudo: yes
 EOF
 
 

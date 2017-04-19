@@ -9,7 +9,7 @@ node(build_ova_node){ws{
                 "BUILD_TYPE=vmware",
                 "STAGE_REPO_NAME=${env.STAGE_REPO_NAME}",
                 "DEB_COMPONENT=${env.DEB_COMPONENT}",
-                "DEB_DISTRIBUTION=trusy"]) { 
+                "DEB_DISTRIBUTION=trusty"]) { 
                 def current_workspace = pwd()
                 deleteDir()
                 def shareMethod

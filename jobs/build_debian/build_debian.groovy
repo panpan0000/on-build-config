@@ -6,7 +6,7 @@ node(build_debian_node){
                 "IS_OFFICIAL_RELEASE=${env.IS_OFFICIAL_RELEASE}",
                 "STAGE_REPO_NAME=${env.STAGE_REPO_NAME}",
                 "DEB_COMPONENT=${env.DEB_COMPONENT}",
-                "DEB_DISTRIBUTION=trusy",
+                "DEB_DISTRIBUTION=trusty",
                 "DEB_ARCHITECTURE=amd64"]) {
                 deleteDir()
                 dir("on-build-config"){
