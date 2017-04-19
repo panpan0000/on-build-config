@@ -50,7 +50,7 @@ class JFrogArtifactory(object):
     def get_repo_list(self):
         uri = "{uri_base}/api/repositories".format(uri_base=self.__artifactory_base)
 
-        response = self.__session.get(uri)
+        response = self.__session.get(uri, verify=False) # Skip CA check
         if response.status_code != 200:
             print "Did not get a 200 in your request: "
             return None
@@ -112,7 +112,8 @@ class JFrogArtifactory(object):
             response = self.__session.put(
                 uri,
                 data=json.dumps(dict_artifact_config),
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
+                verify=False
             )
             if response.status_code != 200:
                 print "Did not get a 200 in your request: "
@@ -156,7 +157,7 @@ class JFrogArtifactory(object):
         finally:
             fp.close()
 
-        response = self.__session.put(url, file_data)
+        response = self.__session.put(url, file_data, verify=False)
         if response.status_code != 201:
             print "Did not get a 201 (Successfully Created) in upload request: "
             return response
@@ -187,7 +188,7 @@ class JFrogArtifactory(object):
         url = "{base}/api/repositories/{repo}"\
             .format(base=self.__artifactory_base, repo=repo_name)
 
-        response = self.__session.delete(url)
+        response = self.__session.delete(url, verify=False)
         if response.status_code == 200:
             print "Repository {repo} deleted successfully."\
                 .format(repo=repo_name)
