@@ -9,10 +9,6 @@ node{
             currentBuild.description = "<a href=${env.MANIFEST_FILE_URL}>${manifest_name}</a>";
         }
 
-        stage("Test"){
-            load("jobs/function_test/function_test.groovy")
-        }
-
         shareMethod.buildAndPublish()
     } finally{
         shareMethod.sendResult(true, true)
