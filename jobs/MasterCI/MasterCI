@@ -3,11 +3,6 @@ node{
     checkout scm
     def shareMethod = load("jobs/shareMethod.groovy")
     try{
-        stage("Create Manifest"){
-            load("jobs/create_manifest/create_manifest.groovy")
-            def manifest_name=env.MANIFEST_FILE_URL.tokenize('/')[-1];
-            currentBuild.description = "<a href=${env.MANIFEST_FILE_URL}>${manifest_name}</a>";
-        }
 
         shareMethod.buildAndPublish()
     } finally{
