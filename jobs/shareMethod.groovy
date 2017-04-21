@@ -31,7 +31,7 @@ def getLockedResourceName(resources,label_name){
 
 def buildAndPublish(){
     // retry times for package build and images build to avoid failing caused by network
-    int retry_times = 3
+    int retry_times = 1
     stage("Packages Build"){
         retry(retry_times){
             load("jobs/build_debian/build_debian.groovy")
