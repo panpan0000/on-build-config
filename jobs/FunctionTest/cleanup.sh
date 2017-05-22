@@ -107,7 +107,6 @@ cleanupDocker(){
 
   echo "clean up /var/lib/docker/volumes"
   docker volume ls -qf dangling=true | xargs -r docker volume rm
- +
 
 }
 
