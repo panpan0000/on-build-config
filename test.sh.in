@@ -355,10 +355,10 @@ fetchOVALog(){
 general_cleanup(){
 
     set +e
-    cleanupVMs
     generateSysLog
     generateMongoLog
     vnc_record_stop
+    cleanupVMs
 
 }
 
