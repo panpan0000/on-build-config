@@ -347,6 +347,23 @@ fetchOVALog(){
     popd
 }
 
+###########################################
+#
+#  Ensure logs are dumpped even build timeout aborted
+#
+#############################################
+general_cleanup(){
+
+    set +e
+    cleanupVMs
+    generateSysLog
+    generateMongoLog
+    vnc_record_stop
+
+}
+
+
+
 ######################################
 #  OVA POST SMOKE TEST RELATED END   #
 ######################################
@@ -421,7 +438,7 @@ if [ "$RUN_CIT_TEST" == true ] || [ "$RUN_FIT_TEST" == true ] ; then
     ucsReset
 
     # register the signal handler to clean up( vagrantDestroy ), with process being killed
-    trap cleanupVMs SIGINT SIGTERM SIGKILL
+    trap general_cleanup SIGINT SIGTERM SIGKILL EXIT
     cleanupVMs
 
     # based on the assumption that in the same folder, the VMs has been exist normally. so don't destroy VM here.
@@ -442,9 +459,12 @@ if [ "$RUN_CIT_TEST" == true ] || [ "$RUN_FIT_TEST" == true ] ; then
     vnc_record_start
     # Run tests
     runTests
-    generateSysLog
-    generateMongoLog
-    vnc_record_stop
+    # Below Clean Up will be run in signal handler : ```trap general_cleanup EXIT```
+    #generateSysLog
+    #generateMongoLog
+    #vnc_record_stop
+    #cleanupVMs # add it into normal process
+
     # Clean Up below
 
     #shutdown vagrant box and delete all resource (like removing vm disk files in "~/VirtualBox VMs/")
