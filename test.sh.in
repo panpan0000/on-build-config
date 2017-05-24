@@ -1,5 +1,5 @@
 #!/bin/bash -ex
-export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Quanta")
+export VCOMPUTE=("${NODE_NAME}-Rinjin1" "${NODE_NAME}-Rinjin2" "${NODE_NAME}-Quanta")
 export UCSPE=("${NODE_NAME}-UCSPE")
 RUN_FIT_TEST="${RUN_FIT_TEST}"
 if [ ! -z "${4}" ]; then
@@ -12,6 +12,11 @@ fi
 MODIFY_API_PACKAGE="${MODIFY_API_PACKAGE}"
 
 cleanupVMs(){
+    set +e
+    if [ -f ${WORKSPACE}/RackHD/example/Vagrantfile ]; then
+        vnc_record_stop
+    fi
+
     vagrantDestroy
     # Suspend any other running vagrant boxes
     vagrantSuspendAll
@@ -76,7 +81,7 @@ execWithTimeout() {
   fi
   echo "execWithTimeout() retry count is $retry"
   echo "execWithTimeout() timeout is set to $timeout"
-  i=1
+  local i=1
   while [[ $i -le $retry ]]
   do
     expect -c "set timeout $timeout; spawn -noecho $cmd; expect timeout { exit 1 } eof { exit 0 }"
@@ -139,14 +144,75 @@ nodesDelete() {
   fi
 }
 
-nodesCreate() {
+nodesRevertSnapshot() {
   cd ${WORKSPACE}/build-config/deployment/
   if [ "${USE_VCOMPUTE}" != "false" ]; then
-    for i in {1..2}
-    do
-      execWithTimeout "ovftool --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE}  --name='${NODE_NAME}-Rinjin${i}' --net:'${NIC}=${NODE_NAME}-switch' '${HOME}/isofarm/OVA/vRinjin-Haswell.ova'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
+    for i in ${VCOMPUTE[@]}; do
+      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},revert_last_snapshot,1,${i}_*"
     done
-    execWithTimeout "ovftool  --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE} --name='${NODE_NAME}-Quanta' --net:'${NIC}=${NODE_NAME}-switch' '${HOME}/isofarm/OVA/vQuanta-T41-Haswell.ova'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
+  fi
+
+}
+
+#######################
+# Param1:   the vm_name to be searched
+#
+# Return:   0 means exist, 1 means not-found 
+######################
+nodeExistCheck(){
+    vm_name=$1
+    if [ "$vm_name" == "" ]; then
+        return 1
+    fi
+    get_vmid_output=$(./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},vm_getid,0,${vm_name}")
+
+    echo "${get_vmid_output}" | grep "return_from_vm_getid" |grep "Not Found"; # use $? to check grep result
+    #it's a bad implementation. it assumes the output of above command will contain a line: "return_from_vm_getid : Not Found"
+
+    if [ $? -eq 0 ]; then  # there's output for above grep
+        return 1
+    else
+        return 0
+    fi
+
+}
+
+#########################
+# deploy vBMC if not exist, and revert to last snapshot if vBMC already deployed
+#
+########################
+nodesCreate() {
+  cd ${WORKSPACE}/build-config/deployment/
+
+  VM_OVA_FILE_LIST=("${HOME}/isofarm/OVA/vRinjin-Haswell.ova" "${HOME}/isofarm/OVA/vRinjin-Haswell.ova" "${HOME}/isofarm/OVA/vQuanta-T41-Haswell.ova")
+
+  if [ "${USE_VCOMPUTE}" != "false" ]; then
+    local i=0
+    for vm_name in "${VCOMPUTE[@]}"
+    do
+        set +e
+        nodeExistCheck $vm_name
+        if [ $? -eq 0 ]; then # VM Name Found
+             echo "[ESX] vNode (name=$vm_name) already in place, skip the ova deployment."
+             echo "[ESX] revert vNode (name=$vm_name) to its last VM snapshot."
+             set -e
+             nodesRevertSnapshot
+        else
+             ova_file=${VM_OVA_FILE_LIST[${i}]}
+             if [ ! -f $ova_file ]; then
+                 echo "[Error] OVA File Not Found (file=$ova_file), Abort!"
+                 exit 2
+             fi
+             echo "[ESX] Newly deploy OVA image($ova_file) with vm name $vm_name"
+             set -e
+             execWithTimeout "ovftool --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE}  --name='${vm_name}' --net:'${NIC}=${NODE_NAME}-switch' '${ova_file}'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
+             if [ $? -ne 0 ]; then
+                 echo "[Error] Deploy vNode failed($vm_name). Aborted!"
+                 exit 3
+             fi
+        fi
+        i=$(( $i + 1 ))
+    done
   else
     nodesOff
   fi
@@ -221,11 +287,14 @@ vnc_record_start(){
   # including vagrant ssh -c "bash xx.sh " &
   nohup vagrant ssh -c "cd /home/vagrant/src/build-config/;   bash vnc_record.sh /home/vagrant/log/ $fname_prefix" &
   #/home/vagrant/log/ will be mapped to host(outside vagrant)'s $WORKSPACE/build-log
+  popd
 }
 
 vnc_record_stop(){
   #sleep 2 sec to ensure FLV finishes the disk I/O before VM destroyed
+  pushd ${WORKSPACE}/RackHD/example 
   vagrant ssh -c 'set +e ;    pkill flvrec.py;  sleep 2 ' 
+  popd
 
 }
 

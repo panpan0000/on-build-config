@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 REPOS=("on-http" "on-taskgraph" "on-dhcp-proxy" "on-tftp" "on-syslog")
 
 HTTP_STATIC_FILES="${HTTP_STATIC_FILES}"
@@ -40,6 +40,7 @@ wget_download(){
 
 
 dlHttpFiles() {
+  echo "[prepare_manifest.sh] dlHttpFiles"
   dir=${WORKSPACE}/build-deps/on-http/static/http/common
   mkdir -p ${dir} && cd ${dir}
   if [ -n "${INTERNAL_HTTP_ZIP_FILE_URL}" ]; then
@@ -62,6 +63,7 @@ dlHttpFiles() {
 }
 
 dlTftpFiles() {
+  echo "[prepare_manifest.sh] dlTftpFiles"
   dir=${WORKSPACE}/build-deps/on-tftp/static/tftp
   mkdir -p ${dir} && cd ${dir}
   if [ -n "${INTERNAL_TFTP_ZIP_FILE_URL}" ]; then
@@ -83,6 +85,7 @@ dlTftpFiles() {
 }
 
 preparePackages() {
+    echo "[prepare_manifest.sh] preparePackages"
     pushd ${WORKSPACE}
     ./build-config/build-release-tools/HWIMO-BUILD ./build-config/build-release-tools/application/reprove.py \
     --manifest ${MANIFEST_FILE} \
