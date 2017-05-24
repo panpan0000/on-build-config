@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Quanta")
 
 VCOMPUTE="${VCOMPUTE}"
@@ -7,7 +7,11 @@ if [ -z "${VCOMPUTE}" ]; then
 fi
 
 
+
+
+
 nodesDelete() {
+  echo "[prepare_common.sh] nodesDelete"
   cd ${WORKSPACE}/build-config/deployment/
   if [ "${USE_VCOMPUTE}" != "false" ]; then
     VCOMPUTE+=("${NODE_NAME}-ova-for-post-test")
@@ -18,6 +22,7 @@ nodesDelete() {
 }
 
 cleanupENVProcess() {
+  echo "[prepare_common.sh] cleanupENVProcess"
   # Kill possible socat process left by ova-post-smoke-test
   # eliminate the effect to other test
   socat_process=`ps -ef | grep socat | grep -v grep | awk '{print $2}' | xargs`
@@ -27,6 +32,7 @@ cleanupENVProcess() {
 }
 
 clean_running_containers() {
+    echo "[prepare_common.sh]  clean_running_containers"
     local containers=$(docker ps -a -q)
     if [ "$containers" != "" ]; then
         echo "Clean Up containers : " ${containers}
@@ -35,9 +41,11 @@ clean_running_containers() {
     fi
 }
 
+echo "[prepare_common.sh]  --- start ---"
 if [ "$SKIP_PREP_DEP" == false ] ; then
   # Prepare the latest dependent repos to be shared with vagrant
-  nodesDelete
+  #nodesDelete
   cleanupENVProcess
   clean_running_containers
 fi
+echo "[prepare_common.sh]  --- ends ---"

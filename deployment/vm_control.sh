@@ -1,4 +1,5 @@
 #!/bin/bash
+set +x
 operation_file="vm_operation.sh"
 Usage()
 {
@@ -12,7 +13,7 @@ Usage()
     echo "    ip       : the IP address of ESXi server"
     echo "    user_name: the user name of ESXi server"
     echo "    password : the password of ESXi server."
-    echo "    action   : the action should be taken on the specific VM. power_on,power_off and delete are supported"
+    echo "    action   : the action should be taken on the specific VM. power_on,power_off , take_snapshot, revert_last_snapshot and delete are supported"
     echo "    duration :the duration time between the action, the unit is second(s)"
     echo "    vm_name  : the name of VM which will be operated. Regular Expression is supported"
 }
@@ -37,7 +38,7 @@ to_array() #transform input to a array using the given IFS
 {
     IFS=$2
     result=($1)
-    i=0
+    local i=0
     result_num=${#result[@]}
     while [ $i -lt $result_num ]
     do
@@ -152,13 +153,13 @@ do
     else
         server_password=${node_info[2]}
     fi
-    ./scp_transfer.exp $server_ip $server_user_name $server_password $operation_file
+    ./scp_transfer.exp $server_ip $server_user_name $server_password $operation_file > /dev/null 2>&1
     ./check_scp.exp $server_ip $server_user_name $server_password $operation_file > /dev/null 2>&1
     if [ $? -ne 0 ];then
         echo "ERROR: file $operation_file scp fails"
         continue
     fi
-    echo "power_on power_off reset delete" | grep -w ${node_info[3]} > /dev/null 2>&1
+    echo "vm_getid power_on power_off reset delete take_snapshot revert_last_snapshot" | grep -w ${node_info[3]} > /dev/null 2>&1
     if [ $? -ne 0 ];then
         echo "ERROR: value of action ${node_info[3]} is not expected"
         continue

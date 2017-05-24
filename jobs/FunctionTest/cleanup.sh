@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Quanta")
 VCOMPUTE="${VCOMPUTE}"
@@ -36,12 +36,30 @@ virtualBoxDestroyAll() {
     vboxmanage unregistervm ${uuid}
   done
 }
+nodesOff() {
+  cd ${WORKSPACE}/build-config/deployment/
+  if [ "${USE_VCOMPUTE}" != "false" ]; then
+    for i in ${VCOMPUTE[@]}; do
+       ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},power_off,1,${i}_*"
+    done
+  fi
+}
+
+nodesRevertSnapshot() {
+  cd ${WORKSPACE}/build-config/deployment/
+  if [ "${USE_VCOMPUTE}" != "false" ]; then
+    for i in ${VCOMPUTE[@]}; do
+      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},revert_last_snapshot,1,${i}_*"
+    done
+  fi
+
+}
 
 nodesDelete() {
   cd ${WORKSPACE}/build-config/deployment/
   if [ "${USE_VCOMPUTE}" != "false" ]; then
     if [ $TEST_TYPE == "ova" ]; then
-      VCOMPUTE+=("${NODE_NAME}-ova-for-post-test")
+      VCOMPUTE=("${NODE_NAME}-ova-for-post-test")
     fi
     for i in ${VCOMPUTE[@]}; do
       ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},delete,1,${i}_*"
@@ -117,8 +135,12 @@ restart3rdServices(){
   echo $SUDO_PASSWORD |sudo -S service rabbitmq-server start
 }
 
+echo "cleanup.sh ---- starts ----"
 cleanupVMs
-nodesDelete
+nodesOff
+nodesRevertSnapshot
+#nodesDelete
 cleanupENVProcess
 cleanupDocker
 restart3rdServices
+echo "cleanup.sh ---- ends ----"
