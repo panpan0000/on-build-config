@@ -192,6 +192,12 @@ def functionTest(String test_name, String label_name, String TEST_GROUP, Boolean
                                     }
                                 }
                                 if(result == "FAILURE" && KEEP_FAILURE_ENV == "true"){
+
+                                    // Clean/Unregister the signal handler, which was setup in test.sh
+                                    sh '''#!/bin/bash -x
+                                    trap - SIGINT SIGTERM SIGKILL EXIT
+                                    '''
+
                                     int sleep_mins = Integer.valueOf(KEEP_MINUTES)
                                     def message = "Job Name: ${env.JOB_NAME} \n" + "Build Full URL: ${env.BUILD_URL} \n" + "Status: FAILURE \n" + "Stage: $test_name \n" + "Node Name: $node_name \n" + "Reserve Duration: $sleep_mins minutes \n"
                                     echo "$message"
