@@ -184,7 +184,7 @@ nodeExistCheck(){
 nodesCreate() {
   cd ${WORKSPACE}/build-config/deployment/
 
-  VM_OVA_FILE_LIST=("${HOME}/isofarm/OVA/vRinjin-Haswell.ova" "${HOME}/isofarm/OVA/vRinjin-Haswell.ova" "${HOME}/isofarm/OVA/vQuanta-T41-Haswell.ova")
+  VM_OVA_FILE_LIST=("${HOME}/isofarm-bri/OVA/vRinjin-Haswell.ova" "${HOME}/isofarm-bri/OVA/vRinjin-Haswell.ova" "${HOME}/isofarm-bri/OVA/vQuanta-T41-Haswell.ova")
 
   if [ "${USE_VCOMPUTE}" != "false" ]; then
     local i=0
