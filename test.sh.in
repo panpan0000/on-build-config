@@ -233,6 +233,20 @@ vagrantUp() {
   cp -rf ${WORKSPACE}/build-config/vagrant/* .
   mkdir -p ${WORKSPACE}/build-log
   result=0
+
+  echo "Dump Env ----Starts-----"
+  set +e
+  echo "$(vboxmanage list vms)"
+  echo "$(vagrant global-status --prune)"
+  echo "$(sudo lsof -i :9090)"
+  echo "$(sudo netstat -plnt | grep ':9090')"
+  local the_pid=$($sudo lsof -i :9090|tail -n1| awk {'print $2'})
+  if [ "$the_pid" != "" ]; then
+      ps -lef|grep $the_pid
+  fi
+  set -e
+  echo "Dump Env ----Ends-----"
+
   for i in {1..2}
   do
       CONFIG_DIR=${CONFIG_PATH} WORKSPACE=${WORKSPACE} vagrant up --provision
