@@ -226,8 +226,9 @@ vagrantSuspendAll() {
 
 CONFIG_PATH=${CONFIG_PATH-build-config/vagrant/config/mongo}
 vagrantUp() {
-  sudo apt-get -y install nfs-kernel-server
-  sudo service nfs-kernel-server start
+  # Already manually install on all slaves
+  #sudo apt-get -y install nfs-kernel-server
+  #sudo service nfs-kernel-server start
 
   cd ${WORKSPACE}/RackHD/example
   cp -rf ${WORKSPACE}/build-config/vagrant/* .
