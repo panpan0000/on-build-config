@@ -1,4 +1,7 @@
 #!/bin/bash -ex
+export DHCP_NIC=em1
+export VNODE_COUNT=3
+
 export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Quanta")
 export UCSPE=("${NODE_NAME}-UCSPE")
 RUN_FIT_TEST="${RUN_FIT_TEST}"
@@ -118,6 +121,173 @@ ucsReset() {
   fi
 }
 
+
+
+
+##########################  Create Nodei.yml  #####################
+
+
+customize_a_infrasim_config()
+{
+    # make it in ${WORKSPACE}
+    DIR=$1
+    pushd $DIR
+    wget https://raw.githubusercontent.com/InfraSIM/tools/master/packer/scripts/infrasim.yml --no-check-certificate
+    sed -i 'N; s/bmc:\n    interface: ens192//' infrasim.yml
+    sed -i -e '1h;2,$H;$!d;g' -e 's/        -\n            network_mode: bridge\n            network_name: br1\n            device: e1000//g' infrasim.yml
+    #sed -i 's/size: 4096/size: 2048/g' infrasim.yml
+    for id in $(seq 1 ${VNODE_COUNT}); do
+        cp infrasim.yml  node${id}.yml
+        sed -i "s/type: quanta_d51/type: ${NODE_TYPE_ARRAY[$((${id}-1))]}/"  node${id}.yml
+        sed -i "s/name: default/name: node${id}\nnamespace: node${id}/" node${id}.yml
+        echo -e "\nbmc:\n    interface: br0" >> node${id}.yml  # so that catalogs/bmc can have IP
+    done
+    popd
+}
+
+##########################  Download IVN and prepare  #####################
+
+prepare_ivn()
+{
+    # to support build skupack in https://github.com/RackHD/RackHD/blob/master/test/deploy/rackhd_stack_init.py#L65
+    sudo apt-get install devscripts debhelper fakeroot
+
+    # to support the namespace setup
+    sudo apt-get install -y bridge-utils openvswitch-switch
+    
+    cd ${WORKSPACE}
+    git clone https://github.com/xiaowenjiang/ivn.git
+    cd ivn
+    git checkout rackhd
+
+    customized_ivn_config
+    
+    
+    # to ensure ESXi install successfully, change some KVM flags per @Robert
+    
+
+
+    if [  "$(grep nested=y /etc/modprobe.d/kvm-intel.conf)" == "" ] || [ "$(grep ept=y /etc/modprobe.d/kvm-intel.conf)" == "" ]; then
+        sudo rmmod kvm_intel
+        sudo sh -c "echo options kvm-intel nested=y      >> /etc/modprobe.d/kvm-intel.conf"
+        sudo sh -c "echo options kvm-intel ept=y         >> /etc/modprobe.d/kvm-intel.conf"
+        sudo modprobe kvm_intel
+    fi
+    if [  "$(grep "ignore_msrs=y" /etc/modprobe.d/kvm.conf)" == "" ]; then
+        sudo rmmod kvm_intel
+        sudo rmmod kvm
+        sudo sh -c "echo options kvm       ignore_msrs=y >> /etc/modprobe.d/kvm.conf"
+        sudo modprobe kvm
+        sudo modprobe kvm_intel
+    fi
+    echo " KVM/KVM-Intel Flags as below :"
+    cat /sys/module/kvm/parameters/ignore_msrs
+    cat /sys/module/kvm_intel/parameters/nested
+    cat /sys/module/kvm_intel/parameters/ept
+
+
+
+    sudo pip install -r requirements.txt
+
+}
+
+##########################  IVN: create  network_configuration.yml #####################
+
+customized_ivn_config()
+{
+cat << EOF > network_configuration.yml
+---
+# root interfaces
+switches:
+  br-int:                   # internal switch
+    ifname: br-int
+    type: static
+    address: 172.31.128.1
+    netmask: 255.255.252.0
+    ports:
+     - ifname: eth1
+  br-ex:                    # external switch
+    ifname: br-ex
+    type: static
+    address: 0.0.0.0
+    metmask: 255.255.255.0
+namespaces:
+EOF
+
+
+
+for id in $(seq 1 ${VNODE_COUNT}); do
+    cat << EOF >> network_configuration.yml
+  - name: node${id}
+    interfaces:
+    - ifname: einf0         # vNIC in namespace
+      type: static
+      address: 0.0.0.0
+      bridge:
+        ifname: br0
+        type: dhcp
+
+EOF
+done
+
+sed -i s/eth1/${DHCP_NIC}/ network_configuration.yml
+
+}
+
+##########################  Run IVN #####################
+
+runs_ivn()
+{
+
+    ######## Create namespace and bridges ##############
+
+    # set 2nd NIC IP to 0.0.0.0
+    sudo ifconfig $DHCP_NIC  0
+
+    if [  "$(grep "source /etc/network/interfaces.d/*" /etc/network/interfaces)" == "" ]; then
+        sudo echo "source /etc/network/interfaces.d/*" >> /etc/network/interfaces
+    fi
+
+    sudo ./creator_rackhd.py delete
+
+    sudo ./creator_rackhd.py create
+    
+    sudo ip netns list
+}
+
+##########################  Start InfraSIM #####################
+start_infraSIM()
+{
+    NODE_YML_DIR=$1
+    
+    set +e
+    # destroy previous running InfraSIM
+    for id in $(seq 1 ${VNODE_COUNT}); do
+        n=node${id}
+        sudo infrasim node destroy ${n}
+    done
+    set -e
+    
+    #sudo infrasim init -f # Hmm... I guess we need to do it . but optional
+
+    for id in $(seq 1 ${VNODE_COUNT}); do
+        n=node${id}
+        sudo infrasim config add $n    $NODE_YML_DIR/${n}.yml 
+        sudo infrasim config update $n $NODE_YML_DIR/${n}.yml
+        sudo infrasim node start $n
+    done
+
+    echo "Check InfraSIM running well."
+    for id in $(seq 1 ${VNODE_COUNT}); do
+        n=node${id}
+        if [ -n "$(sudo infrasim node  status $n |grep stopped)" ] ; then
+            echo "InfraSIM node $n not running successfully".
+            exit -2
+        fi
+    done
+
+}
+
 nodesOff() {
   cd ${WORKSPACE}/build-config/deployment/
   if [ "${USE_VCOMPUTE}" != "false" ]; then
@@ -131,40 +301,30 @@ nodesOff() {
 }
 
 nodesOn() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    for i in ${VCOMPUTE[@]}; do
-      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},power_on,1,${i}_*"
-    done
-  else
-     ./telnet_sentry.exp ${SENTRY_HOST} ${SENTRY_USER} ${SENTRY_PASS} on ${OUTLET_NAME}
-     sleep 5
-  fi
+   local infrasim_dir=${WORKSPACE}/infrasim
+   start_infraSIM   $infrasim_dir
 }
 
 nodesDelete() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    if [ ${OVA_POST_TEST} == "true" ]; then
-      VCOMPUTE+=("${NODE_NAME}-ova-for-post-test")
-    fi
-    for i in ${VCOMPUTE[@]}; do
-      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},delete,1,${i}_*"
+    set +e
+    local infrasim_dir=${WORKSPACE}/infrasim
+    pushd $infrasim_dir
+    # destroy previous running InfraSIM
+    for id in $(seq 1 ${VNODE_COUNT}); do
+        local n=node${id}
+        sudo infrasim node destroy ${n}
     done
-  fi
+    set -e
 }
 
 nodesCreate() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    for i in {1..2}
-    do
-      execWithTimeout "ovftool --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE}  --name='${NODE_NAME}-Rinjin${i}' --net:'${NIC}=${NODE_NAME}-switch' '${HOME}/isofarm/OVA/vRinjin-Haswell.ova'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
-    done
-    execWithTimeout "ovftool  --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE} --name='${NODE_NAME}-Quanta' --net:'${NIC}=${NODE_NAME}-switch' '${HOME}/isofarm/OVA/vQuanta-T41-Haswell.ova'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
-  else
-    nodesOff
-  fi
+    local infrasim_dir=${WORKSPACE}/infrasim
+    mkdir $infrasim_dir
+    customize_a_infrasim_config  $infrasim_dir
+    pushd $infrasim_dir
+    prepare_ivn
+    customized_ivn_config
+    runs_ivn
 }
 
 vnc_record_start(){

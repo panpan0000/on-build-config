@@ -8,14 +8,18 @@ fi
 
 
 nodesDelete() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    VCOMPUTE+=("${NODE_NAME}-ova-for-post-test")
-    for i in ${VCOMPUTE[@]}; do
-      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},delete,1,${i}_*"
+    set +e
+    local infrasim_dir=${WORKSPACE}/infrasim
+    pushd $infrasim_dir
+    # destroy previous running InfraSIM
+    for id in $(seq 1 ${VNODE_COUNT}); do
+        local n=node${id}
+        sudo infrasim node destroy ${n}
     done
-  fi
+    set -e
+
 }
+
 
 cleanupENVProcess() {
   # Kill possible socat process left by ova-post-smoke-test
