@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash +x
 
 export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Quanta")
 VCOMPUTE="${VCOMPUTE}"
