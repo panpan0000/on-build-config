@@ -27,7 +27,7 @@ fname_prefix=$2
 
 #Install vnc2flv is not installed
 if [ "$(which flvrec.py)" == "" ]; then
-     sudo pip install vnc2flv
+      echo $SUDO_PASSWORD |sudo -S pip install vnc2flv
 fi
 FLVREC=flvrec.py
 
