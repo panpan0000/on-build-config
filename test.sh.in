@@ -1,15 +1,31 @@
 #!/bin/bash -ex
+NODE_NAME=vmslave20
+USER=jenkins
+WORKSPACE=~/
+BUILD_ID=1
+SRC_CODE=build-deps
+ON_BUILD_CONFIG=on-build-config
+VNODE_COUNT=2
+RUN_FIT_TEST=true
+SUDO_PASSWORD=Zilog256
+MODIFY_API_PACKAGE=false
 export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Quanta")
 ##############################################################
 ## Pre-condition:
-# (1)RackHD all repos code are cloned and npm-installed in folder : ${WORKSPACE}/build-deps
-# (2)on-build-config repo is cloned in ${WORKSPACE}/build-config
-# (3) rackhd_pipeline_docker.tar downloaded from Jenkins archieve and places in  $WORKSPACE
+# (1)RackHD all repos code are cloned and npm-installed in folder : ${WORKSPACE}/${SRC_CODE}
+# (2) RackHD repo only as tests repo in folder  ${WORKSPACE}/RackHD
+# (3) on-build-config repo is cloned in ${WORKSPACE}/${ON_BUILD_CONFIG}
+# (4) rackhd_pipeline_docker.tar downloaded from Jenkins archieve and places in  $WORKSPACE
+# (5) Optional: InfraSIM_Tools in ${WORKSPACE} for infrasim/tools repo src code
+#
 # Parameters(ENV Variables):
 # NODE_NAME  - Jenkins build-in Env Var. the running slave name
 # USER       - Jenkins build-in Env Var. the account runs this script on vmslave
 # WORKSPACE  - Jenkins build-in Env Var. the working folder
 # BUILD_ID   - Jenkins build-in Env Var. the Jenkins Build ID digit.
+# SRC_CODE   - the folder name inside ${WORKSPACE}, which all RackHD source code live
+# ON_BUILD_CONFIG -  the folder name inside ${WORKSPACE}, which on-build-config repo live
+# VNODE_COUNT  - How Many vNodes will be deployed
 # RUN_FIT_TEST - true if running FIT
 # MODIFY_API_PACKAGE -  true if RackHD/on-http repo under test
 # API_PACKAGE_LIST   -  "on-http-api2.0 on-http-redfish-1.0"
@@ -19,32 +35,153 @@ export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Qua
 # TEST_STACK - the FIT Test Stack mapping to config files: example "-stack docker_local_run" , "-stack vagrant"...
 # EXTRA_HW   - Physical Stack : Hardware Array
 # BASE_REPO_URL - the base repo URL for OS Installation image repo. default http://172.31.128.1:8080
+# TEST_UCS   - if UCS is included in this test. default true
 ##############################################################
+
+
+#############################################
+#
+# Default Parameter Checking
+#
+##########################################
+if  [ ! -n "${VNODE_COUNT}" ];  then
+    VNODE_COUNT=2
+fi
+
+if   [ ! -n "${SRC_CODE}" ];  then
+    SRC_CODE="build-deps"
+fi
+
+if   [ ! -n "${ON_BUILD_CONFIG}" ];  then
+    ON_BUILD_CONFIG="build-config"
+fi
+
+if  [ ! -n "${RUN_FIT_TEST}" ]; then
+    RUN_FIT_TEST=true
+fi
+
+if  [ ! -n "${API_PACKAGE_LIST}" ]; then
+    API_PACKAGE_LIST="on-http-api2.0 on-http-redfish-1.0"
+fi
+
+if [ ! -n "${MODIFY_API_PACKAGE}" ]; then
+    MODIFY_API_PACKAGE=true
+fi
+
+if [ ! -n "${TEST_TYPE}" ]; then
+    TEST_TYPE="manifest"
+fi
+
+if  [ ! -n "${TEST_GROUP}" ]; then
+    TEST_GROUP="-test tests -group smoke"
+fi
+
+if  [ ! -n "${TEST_STACK}" ]; then
+    TEST_STACK="-stack docker_local_run"
+fi
+
+if  [ ! -n "${BASE_REPO_URL}" ]; then
+    BASE_REPO_URL="http://172.31.128.1:8080"
+fi
+
+if  [ ! -n "${TEST_UCS}" ]; then
+    TEST_UCS=false
+fi
 
 
 export UCSPE=("${NODE_NAME}-UCSPE")
 RUN_FIT_TEST="${RUN_FIT_TEST}"
 MODIFY_API_PACKAGE="${MODIFY_API_PACKAGE}"
 
+##############################################
+#
+#Clean Up docker images with name my/test
+#
+##########################################
 cleanUpDockerImages(){
-    echo $SUDO_PASSWORD |sudo -S docker rmi $(echo $SUDO_PASSWORD |sudo -S docker images -q)
+    echo $SUDO_PASSWORD |sudo -S docker rmi $(echo $SUDO_PASSWORD |sudo -S docker images my/test -q)             # remove my/test image
+    echo $SUDO_PASSWORD |sudo -S docker rmi $(echo $SUDO_PASSWORD |sudo -S docker images -f "dangling=true" -q ) # remove <none>:<none> images
 }
-
+##############################################
+#
+# Remove docker instance which are running
+#
+###########################################
 cleanUpDockerContainer(){
+    echo $SUDO_PASSWORD |sudo -S docker stop $(echo $SUDO_PASSWORD |sudo -S docker ps -a -q)
     echo $SUDO_PASSWORD |sudo -S docker rm $(echo $SUDO_PASSWORD |sudo -S docker ps -a -q)
 }
 
-cleanUp(){
+######################################
+#
+# Clean Up runnning docker instance
+#
+#####################################
+cleanup_dockers(){
+    echo "CleanUp Dockers ..."
     set +e
     cleanUpDockerContainer
     cleanUpDockerImages
+    set -e
+}
+#########################################
+#
+# Stop Host services to avoid noice
+#
+#######################################
+stop_services(){
+    echo "Stop Services (mongo/rabbitmq)..."
+    set +e
     echo $SUDO_PASSWORD |sudo -S service mongodb stop
     echo $SUDO_PASSWORD |sudo -S service rabbitmq-server stop
     set -e
 }
+#######################################
+#
+# Delete bridge and restore em1 IP
+#
+#####################################
+restore_nic_config(){
+    echo "Restore NIC configurations and delete old open vswitch bridge..."
+    set +e
+    # delete the bridge created by open vswitch
+    local bridges=$(  echo $SUDO_PASSWORD |sudo -S  ovs-vsctl list-br| grep ovs-br )
+    if [ "$bridges" != "" ];  then
+         local DHCP_NIC=$( echo $SUDO_PASSWORD |sudo -S  ovs-vsctl list-ports ${bridges} )
+         local original_ip=$(ifconfig ${bridges} | awk '/inet addr/{print substr($2,6)}')
+         echo $SUDO_PASSWORD |sudo -S ovs-vsctl del-br $bridges
+         echo $SUDO_PASSWORD |sudo -S ifconfig $DHCP_NIC $original_ip
+    fi
+    set -e
+}
+##############################################
+# Clean up previous dirty space before everyting starts
+#
+#############################################
+prepare_env(){
+    echo "Prepare -----------------Start -------------------"
+    cleanup_dockers
+    stop_services
+    restore_nic_config
+    echo "Prepare -----------------End ---------------------"
+}
+############################################
+#
+# Clean Up after script done
+#
+###########################################
+cleanUp(){
+    echo "CleanUp [$@]-----------------Start -------------------"
+    cleanup_dockers
+    stop_services
+    restore_nic_config
+    exportLog    
+    echo "CleanUp [$@]-----------------End ---------------------"
+}
+
 
 apiPackageModify() {
-    pushd ${WORKSPACE}/build-deps/on-http/extra
+    pushd ${WORKSPACE}/${SRC_CODE}/on-http/extra
     sed -i "s/.*git symbolic-ref.*/ continue/g" make-deb.sh
     sed -i "/build-package.bash/d" make-deb.sh
     sed -i "/GITCOMMITDATE/d" make-deb.sh
@@ -53,7 +190,7 @@ apiPackageModify() {
     popd
     for package in ${API_PACKAGE_LIST}; do
       sudo pip uninstall -y ${package//./-} || true
-      pushd ${WORKSPACE}/build-deps/on-http/$package
+      pushd ${WORKSPACE}/${SRC_CODE}/on-http/$package
         fail=true
         while $fail; do
           python setup.py install
@@ -65,58 +202,15 @@ apiPackageModify() {
     done
 }
 
-VCOMPUTE="${VCOMPUTE}"
-if [ -z "${VCOMPUTE}" ]; then
-  VCOMPUTE=("jvm-Quanta_T41-1" "jvm-vRinjin-1" "jvm-vRinjin-2")
-fi
 
 TEST_GROUP="${TEST_GROUP}"
 if [ -z "${TEST_GROUP}" ]; then
    TEST_GROUP="smoke-tests"
 fi
 
-execWithTimeout() {
-  set +e
-  # $1 command to execute
-  # $2 timeout
-  # $3 retries on timeout
-  if [ -z "${1}" ]; then
-     echo "execWithTimeout() Command not specified"
-     exit 2
-  fi
-  cmd="/bin/sh -c \"$1\""
-  #timeout default to one minute
-  timeout=90
-  retry=3
-  result=0
-  if [ ! -z "${2}" ]; then
-    timeout=$2
-  fi
-  if [ ! -z "${3}" ]; then
-    retry=$3
-  fi
-  echo "execWithTimeout() retry count is $retry"
-  echo "execWithTimeout() timeout is set to $timeout"
-  i=1
-  while [[ $i -le $retry ]]
-  do
-    expect -c "set timeout $timeout; spawn -noecho $cmd; expect timeout { exit 1 } eof { exit 0 }"
-    result=$?
-    echo "execWithTimeout() exit code $result"
-    if [ $result = 0 ] ; then
-       break
-    fi
-    ((i = i + 1))
-  done
-  if [ $result = 1 ] ; then
-       echo "execWithTimeout() command timed out $retry times after $timeout seconds"
-       exit 1
-  fi
-  set -e
-}
 
 ucsReset() {
-  cd ${WORKSPACE}/build-config/deployment/
+  cd ${WORKSPACE}/${ON_BUILD_CONFIG}/deployment/
   if [ "${USE_VCOMPUTE}" != "false" ]; then
     for i in ${UCSPE[@]}; do
       ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},reset,1,${i}_*"
@@ -125,57 +219,42 @@ ucsReset() {
 }
 
 nodesOff() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    for i in ${VCOMPUTE[@]}; do
-      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},power_off,1,${i}_*"
-    done
-  else
-     ./telnet_sentry.exp ${SENTRY_HOST} ${SENTRY_USER} ${SENTRY_PASS} off ${OUTLET_NAME}
-     sleep 5
-  fi
+   echo "nodesOff is deprecated"
+   exit -1
 }
 
 nodesOn() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    for i in ${VCOMPUTE[@]}; do
-      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},power_on,1,${i}_*"
-    done
-  else
-     ./telnet_sentry.exp ${SENTRY_HOST} ${SENTRY_USER} ${SENTRY_PASS} on ${OUTLET_NAME}
-     sleep 5
-  fi
+   echo "nodesOn is deprecated"
+   exit -1
+
 }
 
 nodesDelete() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    if [ ${OVA_POST_TEST} == "true" ]; then
-      VCOMPUTE+=("${NODE_NAME}-ova-for-post-test")
-    fi
-    for i in ${VCOMPUTE[@]}; do
-      ./vm_control.sh "${ESXI_HOST},${ESXI_USER},${ESXI_PASS},delete,1,${i}_*"
-    done
-  fi
+   echo "nodesDelete is deprecated"
+   exit -1
+
 }
 
 nodesCreate() {
-  cd ${WORKSPACE}/build-config/deployment/
-  if [ "${USE_VCOMPUTE}" != "false" ]; then
-    for i in {1..2}
-    do
-      execWithTimeout "ovftool --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE}  --name='${NODE_NAME}-Rinjin${i}' --net:'${NIC}=${NODE_NAME}-switch' '${HOME}/isofarm/OVA/vRinjin-Haswell.ova'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
+    pushd ${WORKSPACE}
+    if [ ! -d InfraSIM_Tools ]; then
+        git clone https://github.com/InfraSIM/tools.git InfraSIM_Tools
+    fi
+    pushd InfraSIM_Tools/docker
+    local port_num=5901
+    for vnode_id in $(seq 1 ${VNODE_COUNT})  ; do
+        local infrasim_docker_name=idic${vnode_id}
+        echo "DEBUG: Create Docker instance : $infrasim_docker_name on Port $port_num "
+        sudo ./docker.sh -n $infrasim_docker_name -p $port_num
+        port_num=$(( $port_num + 1 ))
     done
-    execWithTimeout "ovftool  --noSSLVerify --diskMode=${DISKMODE} --datastore=${DATASTORE} --name='${NODE_NAME}-Quanta' --net:'${NIC}=${NODE_NAME}-switch' '${HOME}/isofarm/OVA/vQuanta-T41-Haswell.ova'   vi://${ESXI_USER}:${ESXI_PASS}@${ESXI_HOST}"
-  else
-    nodesOff
-  fi
+    popd
+    
 }
 
 vnc_record_start(){
   mkdir -p ${WORKSPACE}/build-log
-  pushd ${WORKSPACE}/build-config 
+  pushd ${WORKSPACE}/${ON_BUILD_CONFIG} 
   export fname_prefix="vNode"
   if [ ! -z $BUILD_ID ]; then
       export fname_prefix=${fname_prefix}_b${BUILD_ID}
@@ -192,7 +271,7 @@ vnc_record_stop(){
 }
 
 generateSolLog(){
-  pushd ${WORKSPACE}/build-config
+  pushd ${WORKSPACE}/${ON_BUILD_CONFIG}
   bash generate-sol-log.sh > ${WORKSPACE}/sol.log &
 }
 
@@ -291,7 +370,7 @@ portForwarding(){
 }
 
 fetchOVALog(){
-    ansible_workspace=${WORKSPACE}/build-config/jobs/build_ova/ansible
+    ansible_workspace=${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/build_ova/ansible
     # fetch rackhd log
     pushd $ansible_workspace
       echo "ova-post-test ansible_host=$OVA_INTERNAL_IP ansible_user=$OVA_USER ansible_ssh_pass=$OVA_PASSWORD ansible_become_pass=$OVA_PASSWORD" > hosts
@@ -307,17 +386,23 @@ dockerUp(){
     pushd $WORKSPACE
     echo $SUDO_PASSWORD |sudo -S docker load -i rackhd_pipeline_docker.tar
     popd
-    cp -r ${WORKSPACE}/build-deps ${WORKSPACE}/build-config/jobs/pr_gate/docker
-    pushd ${WORKSPACE}/build-config/jobs/pr_gate/docker
-    #cp -r ${WORKSPACE}/build-config/jobs/pr_gate/docker/* .
+    rm -rf ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker/${SRC_CODE}
+    cp -r ${WORKSPACE}/${SRC_CODE} ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker
+    pushd ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker
+    #cp -r ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker/* .
     echo $SUDO_PASSWORD |sudo -S docker build -t my/test .
     echo $SUDO_PASSWORD |sudo -S docker run --net=host -v /etc/localtime:/etc/localtime:ro -d -t my/test
     popd
 }
 
 setupTestsConfig(){
+    echo "SetupTestsConfig ...replace the 172.31.128.1 IP in test configs with actual DHCP port IP"
     RACKHD_DHCP_HOST_IP=$(ifconfig | awk '/inet addr/{print substr($2,6)}' |grep 172.31.128)
-    sed -i "s/172.31.128.1/${RACKHD_DHCP_HOST_IP}/g" ${WORKSPACE}/build-config/jobs/pr_gate/docker/monorail/config.json
+    if [ "$RACKHD_DHCP_HOST_IP" == "" ]; then
+         echo "[Error] There should be a NIC with 172.31.128.xxx IP in your OS."
+         exit -2
+    fi
+    sed -i "s/172.31.128.1/${RACKHD_DHCP_HOST_IP}/g" ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker/monorail/config.json
     if [ "$RUN_FIT_TEST" == true ] ; then
         pushd ${WORKSPACE}/RackHD/test/config
         sed -i "s/\"username\": \"vagrant\"/\"username\": \"${SUDO_USER}\"/g" credentials_default.json
@@ -373,6 +458,7 @@ fitSmokeTest()
 }
 
 exportLog(){
+    echo "exportLog --------------- start --------"
     set +e
     vnc_record_stop
     generateSolLogStop
@@ -380,6 +466,7 @@ exportLog(){
     generateMongoLog
     echo $SUDO_PASSWORD| sudo -S chown -R $USER:$USER ${WORKSPACE}
     set -e
+    echo "exportLog --------------- end --------"
 }
 ######################################
 #  OVA POST SMOKE TEST RELATED END   #
@@ -451,23 +538,26 @@ if [ "$RUN_FIT_TEST" == true ] ; then
     #cleanupVMs
     #nodesDelete
   else
-    # rese the UCSPE emulators 
-    ucsReset
-    cleanUp
+    if [ "$TEST_UCS" == "true" ]; then
+        # rese the UCSPE emulators 
+        ucsReset
+    fi
+    prepare_env
+    overall_status="FAILURE_EXIT"
     # register the signal handler to export log
-    trap exportLog SIGINT SIGTERM SIGKILL EXIT
-    nodesCreate
+    trap "cleanUp $overall_status" SIGINT SIGTERM SIGKILL EXIT
     setupTestsConfig
     dockerUp
+    waitForAPI # run before InfraSIM docker  up
+    nodesCreate # it should run after RackHD up. otherwise, the DHCP inside docker eth1 will hang up
     # Setup the virtual-environment
     setupVirtualEnv
-    waitForAPI
-    nodesOn
 
     generateSolLog
     vnc_record_start
     # Run tests
     runTests " --sm-amqp-use-user guest"
+    overall_status="SUCCESSFUL_EXIT"
   fi
 
 fi
