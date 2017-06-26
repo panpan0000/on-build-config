@@ -5,7 +5,7 @@ WORKSPACE=~/
 BUILD_ID=1
 SRC_CODE=build-deps
 ON_BUILD_CONFIG=on-build-config
-VNODE_COUNT=2
+VNODE_COUNT=1
 RUN_FIT_TEST=true
 SUDO_PASSWORD=Zilog256
 MODIFY_API_PACKAGE=false
@@ -17,6 +17,7 @@ export VCOMPUTE=("${NODE_NAME}-Rinjin1","${NODE_NAME}-Rinjin2","${NODE_NAME}-Qua
 # (3) on-build-config repo is cloned in ${WORKSPACE}/${ON_BUILD_CONFIG}
 # (4) rackhd_pipeline_docker.tar downloaded from Jenkins archieve and places in  $WORKSPACE
 # (5) Optional: InfraSIM_Tools in ${WORKSPACE} for infrasim/tools repo src code
+# (6) Docker CE installed
 #
 # Parameters(ENV Variables):
 # NODE_NAME  - Jenkins build-in Env Var. the running slave name
@@ -93,14 +94,33 @@ export UCSPE=("${NODE_NAME}-UCSPE")
 RUN_FIT_TEST="${RUN_FIT_TEST}"
 MODIFY_API_PACKAGE="${MODIFY_API_PACKAGE}"
 
+
+#############################################
+#
+# Global Variable
+############################################
+RACKHD_DOCKER_NAME="my/test"
+OV_BRIDGE=ovs-br0   # Open VSwitch Bridge Name in Host
+INFRASIM_DOCKER=cxy4430/infrasim-compute
+INFRASIM_DOCKER_TAG=infrasim-compute_227db # latest
+
+
+
 ##############################################
 #
-#Clean Up docker images with name my/test
+#Clean Up docker images with name ${RACKHD_DOCKER_NAME}
 #
 ##########################################
 cleanUpDockerImages(){
-    echo $SUDO_PASSWORD |sudo -S docker rmi $(echo $SUDO_PASSWORD |sudo -S docker images my/test -q)             # remove my/test image
-    echo $SUDO_PASSWORD |sudo -S docker rmi $(echo $SUDO_PASSWORD |sudo -S docker images -f "dangling=true" -q ) # remove <none>:<none> images
+    set +e
+    local to_be_removed="$(docker images ${RACKHD_DOCKER_NAME} -q)  \
+                         $(docker images rackhd/pipeline -q)  \
+                         $(docker images -f "dangling=true" -q )"
+    # remove ${RACKHD_DOCKER_NAME} image,  rackhd/pipeline image and <none>:<none> images
+    if [ "$to_be_removed" != "" ]; then
+         echo $SUDO_PASSWORD |sudo -S docker rmi $to_be_removed
+    fi
+    set -e
 }
 ##############################################
 #
@@ -108,8 +128,13 @@ cleanUpDockerImages(){
 #
 ###########################################
 cleanUpDockerContainer(){
-    echo $SUDO_PASSWORD |sudo -S docker stop $(echo $SUDO_PASSWORD |sudo -S docker ps -a -q)
-    echo $SUDO_PASSWORD |sudo -S docker rm $(echo $SUDO_PASSWORD |sudo -S docker ps -a -q)
+    set +e
+    local running_docker=$(docker ps -a -q)
+    if [ "$running_docker" != "" ]; then
+         docker stop $running_docker
+         docker rm   $running_docker
+    fi
+    set -e
 }
 
 ######################################
@@ -126,7 +151,20 @@ cleanup_dockers(){
 }
 #########################################
 #
-# Stop Host services to avoid noice
+# Start Host services to avoid noise
+#
+#######################################
+start_services(){
+    echo "Stop Services (mongo/rabbitmq)..."
+    set +e
+    echo $SUDO_PASSWORD |sudo -S service mongodb start
+    echo $SUDO_PASSWORD |sudo -S service rabbitmq-server start
+    set -e
+}
+
+#########################################
+#
+# Stop Host services to avoid noise
 #
 #######################################
 stop_services(){
@@ -136,21 +174,47 @@ stop_services(){
     echo $SUDO_PASSWORD |sudo -S service rabbitmq-server stop
     set -e
 }
+
+#######################################
+#
+# Set up Network in Host( Open vSwitch Bridge)
+#
+#####################################
+
+setup_host_network(){
+   local RACKHD_DHCP_HOST_IP=$(ifconfig | awk '/inet addr/{print substr($2,6)}' |grep 172.31.128)
+   if [ "$RACKHD_DHCP_HOST_IP" == "" ]; then
+         echo "[Error] There should be a NIC with 172.31.128.xxx IP in your OS."
+         exit -2
+   fi
+   local RACKHD_DHCP_NIC=$( ifconfig | awk '/172.31.128/ {print $1}' RS="\n\n" )
+   echo "Debug: RackHD DHCP NIC is $RACKHD_DHCP_NIC, IP was $RACKHD_DHCP_HOST_IP."
+   echo $SUDO_PASSWORD |sudo -S ovs-vsctl add-br ${OV_BRIDGE}
+   echo $SUDO_PASSWORD |sudo -S ovs-vsctl add-port ${OV_BRIDGE} $RACKHD_DHCP_NIC
+   echo $SUDO_PASSWORD |sudo -S ovs-vsctl set Bridge ${OV_BRIDGE} other_config:stp-forward-delay=0
+   echo $SUDO_PASSWORD |sudo -S ovs-vsctl set Bridge ${OV_BRIDGE} other_config:stp-hello-time=1
+   echo $SUDO_PASSWORD |sudo -S ovs-vsctl set Bridge ${OV_BRIDGE} stp_enable=no
+   echo $SUDO_PASSWORD |sudo -S ip link set dev ${OV_BRIDGE} up
+   echo $SUDO_PASSWORD |sudo -S ifconfig $RACKHD_DHCP_NIC 0
+   echo $SUDO_PASSWORD |sudo -S ifconfig $RACKHD_DHCP_NIC promisc
+   echo $SUDO_PASSWORD |sudo -S ifconfig  ${OV_BRIDGE} $RACKHD_DHCP_HOST_IP
+}
 #######################################
 #
 # Delete bridge and restore em1 IP
 #
 #####################################
-restore_nic_config(){
+restore_host_network(){
     echo "Restore NIC configurations and delete old open vswitch bridge..."
     set +e
     # delete the bridge created by open vswitch
     local bridges=$(  echo $SUDO_PASSWORD |sudo -S  ovs-vsctl list-br| grep ovs-br )
     if [ "$bridges" != "" ];  then
-         local DHCP_NIC=$( echo $SUDO_PASSWORD |sudo -S  ovs-vsctl list-ports ${bridges} )
+         local DHCP_NIC=$( echo $SUDO_PASSWORD |sudo -S  ovs-vsctl list-ports ${bridges} | head -n1 )
          local original_ip=$(ifconfig ${bridges} | awk '/inet addr/{print substr($2,6)}')
          echo $SUDO_PASSWORD |sudo -S ovs-vsctl del-br $bridges
          echo $SUDO_PASSWORD |sudo -S ifconfig $DHCP_NIC $original_ip
+         echo $SUDO_PASSWORD |sudo -S ifconfig $DHCP_NIC -promisc
     fi
     set -e
 }
@@ -159,11 +223,11 @@ restore_nic_config(){
 #
 #############################################
 prepare_env(){
-    echo "Prepare -----------------Start -------------------"
+    echo "Prepare Env -----------------Start -------------------"
     cleanup_dockers
     stop_services
-    restore_nic_config
-    echo "Prepare -----------------End ---------------------"
+    setup_host_network
+    echo "Prepare Env -----------------End ---------------------"
 }
 ############################################
 #
@@ -172,10 +236,10 @@ prepare_env(){
 ###########################################
 cleanUp(){
     echo "CleanUp [$@]-----------------Start -------------------"
-    cleanup_dockers
-    stop_services
-    restore_nic_config
     exportLog    
+    cleanup_dockers
+    start_services
+    restore_host_network
     echo "CleanUp [$@]-----------------End ---------------------"
 }
 
@@ -235,20 +299,83 @@ nodesDelete() {
 
 }
 
+prepare_pipework(){
+    pushd ${WORKSPACE}
+    git config --global http.sslverify false
+    if [ "$(which pipework)" == "" ]; then
+        git clone https://github.com/jpetazzo/pipework.git
+        echo $SUDO_PASSWORD |sudo -S  scp $PWD/pipework/pipework /usr/local/bin/pipework
+        echo $SUDO_PASSWORD |sudo -S chmod +x /usr/local/bin/pipework
+        popd
+    else
+        echo "pipework is existing...."
+    fi
+}
+
+
+
+####################################
+#
+# Start InfraSIM Docker, then create bridge inside it , bind with ovs-br0 using pipework.
+# then Start InfraSIM app.
+#
+####################################
+
 nodesCreate() {
     pushd ${WORKSPACE}
-    if [ ! -d InfraSIM_Tools ]; then
-        git clone https://github.com/InfraSIM/tools.git InfraSIM_Tools
-    fi
-    pushd InfraSIM_Tools/docker
-    local port_num=5901
+
+    prepare_pipework
+
+    local port_num=15901
+
     for vnode_id in $(seq 1 ${VNODE_COUNT})  ; do
         local infrasim_docker_name=idic${vnode_id}
-        echo "DEBUG: Create Docker instance : $infrasim_docker_name on Port $port_num "
-        sudo ./docker.sh -n $infrasim_docker_name -p $port_num
+        echo "DEBUG: Create Docker instance : $infrasim_docker_name on Port $port_num "i
+
+        #sudo ./docker.sh -n $infrasim_docker_name -p $port_num
+        echo "Start InfraSIM docker"
+        docker run --privileged -p $port_num:5901 -dit --name $infrasim_docker_name  ${INFRASIM_DOCKER}:${INFRASIM_DOCKER_TAG} /bin/bash
+
+        echo "Set up pipework bridge"
+        echo $SUDO_PASSWORD |sudo -S  /bin/bash $(which pipework) ${OV_BRIDGE} -i eth1 $infrasim_docker_name dhclient
+
+        echo "Set up docker internal bridge"
+        docker exec $infrasim_docker_name brctl addbr br0
+        docker exec $infrasim_docker_name brctl addif br0 eth1
+        docker exec $infrasim_docker_name brctl setfd    br0 0
+        docker exec $infrasim_docker_name brctl sethello br0 1
+        docker exec $infrasim_docker_name brctl stp      br0 no
+
+
+        sleep 2
+        local retry_counter=0
+        local retry_total=10
+        local dhcp_ip=""
+        while [ ${retry_counter} != ${retry_total} ]; do
+              dhcp_ip=$(docker exec $infrasim_docker_name ifconfig eth1 | awk '/inet addr/{print substr($2,6)}')
+              if [ "$dhcp_ip" == "" ]; then
+ 	           echo "retry to get docker image $infrasim_docker_name IP. maybe it is still under DHCP."
+                   sleep 2;
+              else
+                   break;
+              fi
+              retry_counter=$(( retry_counter + 1 ))
+	done
+
+	if [ "$dhcp_ip" == "" ]; then
+	   echo "No DHCP services, please check DHCP server."
+           exit -1
+	else
+	   echo "docker internal eth1 IP: $dhcp_ip"
+        fi
+        docker exec $infrasim_docker_name ifconfig eth1 0
+        docker exec $infrasim_docker_name ifconfig eth1 promisc
+        docker exec $infrasim_docker_name ifconfig br0 $dhcp_ip
+        echo "Start InfraSIM node .. "
+        docker exec $infrasim_docker_name infrasim node start
+        
         port_num=$(( $port_num + 1 ))
     done
-    popd
     
 }
 
@@ -282,20 +409,20 @@ generateSolLogStop(){
 
 generateSysLog(){
   set +e
-  containerId=$( echo $SUDO_PASSWORD |sudo -S docker ps|grep "my/test" | awk '{print $1}' )
-  echo $SUDO_PASSWORD |sudo -S docker exec -it $containerId dmesg > ${WORKSPACE}/build-log/dmesg.log
+  containerId=$(  docker ps|grep "${RACKHD_DOCKER_NAME}" | awk '{print $1}' )
+  docker exec -it $containerId dmesg > ${WORKSPACE}/build-log/dmesg.log
 }
 
 generateMongoLog(){
   set +e
-  containerId=$( echo $SUDO_PASSWORD |sudo -S docker ps|grep "my/test" | awk '{print $1}' )
+  containerId=$(  docker ps|grep "${RACKHD_DOCKER_NAME}" | awk '{print $1}' )
   echo $SUDO_PASSWORD |sudo -S docker cp $containerId:/var/log/mongodb ${WORKSPACE}/build-log
   echo $SUDO_PASSWORD |sudo -S chown -R $USER:$USER ${WORKSPACE}/build-log/mongodb
 }
 
 generateRackHDLog(){
   set +e
-  containerId=$( echo $SUDO_PASSWORD |sudo -S docker ps|grep "my/test" | awk '{print $1}' )
+  containerId=$( docker ps|grep "${RACKHD_DOCKER_NAME}" | awk '{print $1}' )
   echo $SUDO_PASSWORD |sudo -S docker cp $containerId:/root/.pm2/logs ${WORKSPACE}/build-log
   echo $SUDO_PASSWORD |sudo -S chown -R $USER:$USER ${WORKSPACE}/build-log/logs
   mv ${WORKSPACE}/build-log/logs/*.log ${WORKSPACE}/build-log
@@ -390,11 +517,16 @@ dockerUp(){
     cp -r ${WORKSPACE}/${SRC_CODE} ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker
     pushd ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker
     #cp -r ${WORKSPACE}/${ON_BUILD_CONFIG}/jobs/pr_gate/docker/* .
-    echo $SUDO_PASSWORD |sudo -S docker build -t my/test .
-    echo $SUDO_PASSWORD |sudo -S docker run --net=host -v /etc/localtime:/etc/localtime:ro -d -t my/test
+    echo $SUDO_PASSWORD |sudo -S docker build -t ${RACKHD_DOCKER_NAME} .
+    echo $SUDO_PASSWORD |sudo -S docker run --net=host -v /etc/localtime:/etc/localtime:ro -d -t ${RACKHD_DOCKER_NAME}
     popd
 }
 
+####################################
+#
+# Modify FIT config files , to  using actual DHCP Host IP instead of 172.31.128.1
+#
+##################################
 setupTestsConfig(){
     echo "SetupTestsConfig ...replace the 172.31.128.1 IP in test configs with actual DHCP port IP"
     RACKHD_DHCP_HOST_IP=$(ifconfig | awk '/inet addr/{print substr($2,6)}' |grep 172.31.128)
@@ -458,15 +590,15 @@ fitSmokeTest()
 }
 
 exportLog(){
-    echo "exportLog --------------- start --------"
+    echo "exportLog: Starts"
     set +e
     vnc_record_stop
     generateSolLogStop
     generateRackHDLog
     generateMongoLog
-    echo $SUDO_PASSWORD| sudo -S chown -R $USER:$USER ${WORKSPACE}
+    echo $SUDO_PASSWORD| sudo -S chown -R $USER:$USER ${WORKSPACE}/build-log
     set -e
-    echo "exportLog --------------- end --------"
+    echo "exportLog: Ends"
 }
 ######################################
 #  OVA POST SMOKE TEST RELATED END   #
@@ -508,23 +640,22 @@ if [ "$RUN_FIT_TEST" == true ] ; then
     #cleanupVMs
     #nodesDelete
   elif [ "$TEST_TYPE" == "docker" ]; then
-    # based on the assumption that in the same folder, the VMs has been exist normally. so don't destroy VM here.
-    
-    nodesCreate
-    
+
+    prepare_env
+    OVERALL_STATUS="FAILURE_EXIT"
+    # register the signal handler to export log
+    trap "cleanUp $OVERALL_STATUS" SIGINT SIGTERM SIGKILL EXIT
+
+    OVERALL_STATUS="FAILURE_EXIT"
+    # register the signal handler to export log
+   
     # Prepare RackHD
     # Forward local host port to ova
     portForwarding localhost
 
-    # We setup the virtual-environment here, since once we
-    # call "nodesOn", it's a race to get to the first test
-    # before the nodes get booted far enough to start being
-    # seen by RackHD. Logically, it would be better IN runTests.
-    # We do it between the vagrant and waitForAPI to use the
-    # time to make the env instead of doing sleeps...
     setupVirtualEnv
     waitForAPI
-    nodesOn &
+    nodesCreate
     # Doesn't support ova smoke test now
     # generateSolLog
     # Run tests
@@ -536,16 +667,15 @@ if [ "$RUN_FIT_TEST" == true ] ; then
 
     #shutdown vagrant box and delete all resource (like removing vm disk files in "~/VirtualBox VMs/")
     #cleanupVMs
-    #nodesDelete
   else
     if [ "$TEST_UCS" == "true" ]; then
         # rese the UCSPE emulators 
         ucsReset
     fi
     prepare_env
-    overall_status="FAILURE_EXIT"
+    OVERALL_STATUS="FAILURE_EXIT"
     # register the signal handler to export log
-    trap "cleanUp $overall_status" SIGINT SIGTERM SIGKILL EXIT
+    trap "cleanUp $OVERALL_STATUS" SIGINT SIGTERM SIGKILL EXIT
     setupTestsConfig
     dockerUp
     waitForAPI # run before InfraSIM docker  up
@@ -557,7 +687,7 @@ if [ "$RUN_FIT_TEST" == true ] ; then
     vnc_record_start
     # Run tests
     runTests " --sm-amqp-use-user guest"
-    overall_status="SUCCESSFUL_EXIT"
+    OVERALL_STATUS="SUCCESSFUL_EXIT"
   fi
 
 fi
