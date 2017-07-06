@@ -145,11 +145,14 @@ cleanUp(){
 #
 #############################################
 backupFile(){
+    local new_name=$1_$(date "+%Y-%m-%d-%H-%M-%S")
     if [ -d $1 ];then
-        mv $1 $1-bk
+        echo "[Warning]: $1 already exists, it will be renamed to $new_name !"
+        mv $1 $new_name
     fi
     if [ -f $1 ];then
-        mv $1 $1.bk
+        echo "[Warning]: $1 already exists, it will be renamed to $new_name !"
+        mv $1 $new_name
     fi
 }
 
