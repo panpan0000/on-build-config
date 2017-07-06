@@ -40,7 +40,7 @@ INFRSIM_INSTANCE_NAME_PREFIX=idic
 ###########################################
 cleanUpDockerContainer(){
     set +e
-    CONTAINERS=$(docker ps -a -q --filter ancestor=$INFRASIM_DOCKER --format="{{.ID}}")
+    CONTAINERS=$(docker ps -a -q --filter ancestor=$INFRASIM_DOCKER:$INFRASIM_DOCKER_TAG --format="{{.ID}}")
     if [ "$CONTAINERS" != "" ]; then
         echo "Stop docker containers..."
         docker stop $CONTAINERS
@@ -87,7 +87,7 @@ modifyInfrasimConfigFile(){
      docker exec $vnode_docker_name  sed -i "s/network_mode: nat/network_mode: bridge/"  $config_file
      docker exec $vnode_docker_name  sed -i "s/network_name: eth0/network_name: br0/"  $config_file
      docker exec $vnode_docker_name  sed -i "s/mac:.*//"  $config_file
-     docker exec $vnode_docker_name  sed -i 's/size: 1024/size: ${INFRSIM_RAM}/g' $config_file
+     docker exec $vnode_docker_name  sed -i "s/size: 1024/size: ${INFRSIM_RAM}/g" $config_file
 }
 
 
@@ -107,10 +107,10 @@ retrieveIPinsideDocker(){
 
     local retry_counter=0
     local retry_total=10
-    local dhcp_ip=""
+    local my_ip=""
     while [ ${retry_counter} != ${retry_total} ]; do
-        dhcp_ip=$(docker exec $infrasim_docker_name ifconfig eth1 | awk '/inet addr/{print substr($2,6)}')
-        if [ "$dhcp_ip" == "" ]; then
+        my_ip=$(docker exec $infrasim_docker_name ifconfig eth1 | awk '/inet addr/{print substr($2,6)}')
+        if [ "$my_ip" == "" ]; then
             echo "retry to get docker image $infrasim_docker_name IP. maybe it is still under DHCP."
             sleep 2;
         else
@@ -118,11 +118,11 @@ retrieveIPinsideDocker(){
         fi
         retry_counter=$(( retry_counter + 1 ))
     done
-    if [ "$dhcp_ip" == "" ]; then
+    if [ "$my_ip" == "" ]; then
         echo "No DHCP services, please check DHCP server."
         return 1
     else
-        eval $ret_var="'$dhcp_ip'"   # return the parameter $3 to invoker
+        eval $ret_var="'$my_ip'"   # return the parameter $3 to invoker
         return 0
     fi
    
@@ -151,7 +151,7 @@ setupInfrasimNetwork(){
 
     # retry to obtain eth1's IP inside infrasim instance
     local dhcp_ip=""
-    retrieveIPinsideDocker $infrasim_docker_name  "eth1"  "dhcp_ip"  # the 3rd parameter is the ret variable's name
+    retrieveIPinsideDocker $infrasim_docker_name  "eth1"  dhcp_ip  # the 3rd parameter is the ret variable's name
     if [ $? -ne 0 ]; then
         echo "[Error] Timeout waiting for DHCP of Infrasim internal eth1 IP from $vnode_docker_name."
         exit -1
@@ -199,23 +199,24 @@ dockerPullWithRetry(){
 ####################################
 startInfrasimNodes() {
 
+    # Prepare InfraSIM running
     prepare_pipework
+    dockerPullWithRetry ${INFRASIM_DOCKER}:${INFRASIM_DOCKER_TAG}   3
 
     local port_num=15901 # the Host VNC port base
 
     local vnode_id
-    for vnode_id in $(seq 1 ${vnode_count})  ; do
+    for vnode_id in $(seq 1 ${VNODE_COUNT})  ; do
 
         local infrasim_docker_name=idic${vnode_id}
 
         echo "[Info]: create docker instance : $infrasim_docker_name on port $port_num "
 
-        dockerPullWithRetry ${INFRASIM_DOCKER}:${INFRASIM_DOCKER_TAG}   3
         docker run --privileged -p ${port_num}:5901 -dit --name $infrasim_docker_name  ${INFRASIM_DOCKER}:${INFRASIM_DOCKER_TAG} /bin/bash
 
 
         # modify the infrasim config file
-        modifyInfrasimConfig ${vnode_id} ${infrasim_docker_name}
+        modifyInfrasimConfigFile ${vnode_id} ${infrasim_docker_name}
 
         # setup Pipework network and InfraSIM br0
         setupInfrasimNetwork ${infrasim_docker_name}
