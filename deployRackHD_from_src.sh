@@ -29,8 +29,6 @@ Usage(){
     echo "                       If it's not provided, the script will generate a new manifest with latest commit of repositories of RackHD"
     echo "      -b, --ON_BUILD_CONFIG_DIR: The directory of repository on-build-config"
     echo "                       If it's not provided, the script will clone the latest repository on-build-config under $WORKSPACE"
-    echo "      -r, --RACKHD_DIR: The directory of repository RackHD"
-    echo "                       If it's not provided, the script will clone the latest repository RackHD under $WORKSPACE"
     echo "      -i, --RACKHD_IMAGE_PATH: The path of base docker image of rackhd CI test (rackhd/pipeline)"
     echo "                       If it's not provided, the script will download the image from jenkins artifacts"
 }
@@ -185,13 +183,6 @@ prepareEnv(){
         backupFile on-build-config
         git clone https://github.com/RackHD/on-build-config
         ON_BUILD_CONFIG_DIR=$WORKSPACE/on-build-config
-        popd
-    fi
-    if [ ! -n "${RACKHD_DIR}" ]; then
-        pushd $WORKSPACE
-        backupFile RackHD
-        git clone https://github.com/RackHD/RackHD
-        RACKHD_DIR=$WORKSPACE/RackHD
         popd
     fi
     if [ ! -n "${RACKHD_IMAGE_PATH}" ]; then
@@ -392,9 +383,6 @@ parseArguments(){
                                             ;;
             -b | --ON_BUILD_CONFIG_DIR )       shift
                                             ON_BUILD_CONFIG_DIR=$1
-                                            ;;
-            -r | --RACKHD_DIR )             shift
-                                            RACKHD_DIR=$1
                                             ;;
             -i | --RACKHD_IMAGE_PATH )      shift
                                             RACKHD_IMAGE_PATH=$1
