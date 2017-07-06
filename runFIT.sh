@@ -59,7 +59,7 @@ vnc_record_stop(){
 #  Start to export the sol log of nodes
 #
 ############################################
-exportSolLog(){
+exportSolLogStart(){
     pushd ${ON_BUILD_CONFIG_DIR}
     bash generate-sol-log.sh > ${WORKSPACE}/sol.log &
     popd
@@ -203,7 +203,7 @@ runTests(){
     trap "cleanUp $OVERALL_STATUS" SIGINT SIGTERM SIGKILL EXIT
     setupTestsConfig
     setupVirtualEnv
-    generateSolLog
+    exportSolLogStart
     vnc_record_start
     runFIT " --sm-amqp-use-user guest"
     OVERALL_STATUS="SUCCESSFUL_EXIT"
