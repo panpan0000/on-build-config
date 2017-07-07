@@ -243,6 +243,9 @@ main(){
             -p | --SUDO_PASSWORD )          shift
                                             SUDO_PASSWORD=$1
                                             ;;
+            -g | --TEST_GROUP )             shift
+                                            TEST_GROUP=$1
+                                            ;;
             * )                             Usage
                                             exit 1
         esac
@@ -278,6 +281,10 @@ main(){
         popd
 
     fi
+    if [ ! -n "$TEST_GROUP" ]; then
+        TEST_GROUP="-test tests -group smoke"
+    fi
+
     runTests   
 }
 

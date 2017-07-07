@@ -13,15 +13,15 @@ BASE_IMAGE_URL=http://rackhdci.lss.emc.com/job/Docker_Image_Build/lastSuccessful
 #
 #########################################
 Usage(){
-    echo "Function: this script is used to deploy RackHD within docker"
-    echo "Usage: $0 [OPTIONS] [ARGUMENTS]"
-    echo "  OPTIONS:"
+    echo "function: this script is used to deploy rackhd within docker"
+    echo "usage: $0 [options] [arguments]"
+    echo "  options:"
     echo "    -h     : give this help list"
-    echo "    cleanUp: remove the running RackHD docker container and RackHD images"
-    echo "    deploy : build a image with RackHD and run it"
-    echo "    Mandatory Arguments:"
-    echo "      -w, --WORKSPACE: The directory of workspace( where the code will be cloned to and staging folder), it's required"
-    echo "      -p, --SUDO_PASSWORD: password of current user which has sudo privilege, it's required."
+    echo "    cleanup: remove the running rackhd docker container and rackhd images"
+    echo "    deploy : build a image with rackhd and run it"
+    echo "    mandatory arguments:"
+    echo "      -w, --workspace: the directory of workspace( where the code will be cloned to and staging folder), it's required"
+    echo "      -p, --sudo_password: password of current user which has sudo privilege, it's required."
     echo "    Optional Arguments:"
     echo "      -s, --SRC_CODE_DIR: The directory of source code which contains all the repositories of RackHD"
     echo "                       If it's not provided, the script will clone the latest source code under $WORKSPACE/build-deps"
@@ -145,14 +145,15 @@ cleanUp(){
 #
 #############################################
 backupFile(){
-    local new_name=$1_$(date "+%Y-%m-%d-%H-%M-%S")
+    
+    local new_name=$( basename $1 )_$(date "+%Y-%m-%d-%H-%M-%S")
     if [ -d $1 ];then
-        echo "[Warning]: $1 already exists, it will be renamed to $new_name !"
-        mv $1 $new_name
+        echo "[Warning]: $1 already exists, it will be moved to $WORKSPACE/$new_name !"
+        mv $1 $WORKSPACE/$new_name
     fi
     if [ -f $1 ];then
-        echo "[Warning]: $1 already exists, it will be renamed to $new_name !"
-        mv $1 $new_name
+        echo "[Warning]: $1 already exists, it will be moved to $WORKSPACE/$new_name !"
+        mv $1 $WORKSPACE/$new_name
     fi
 }
 
@@ -393,18 +394,20 @@ parseArguments(){
             -p | --SUDO_PASSWORD )          shift
                                             SUDO_PASSWORD=$1
                                             ;;
-            * )                             USAGE
+            * )                             Usage
                                             exit 1
         esac
         shift
     done
     if [ ! -n "${WORKSPACE}" ]; then
-        echo "Arguments -w|--WORKSPACE is required"
+        echo "Arguments -w|--WORKSPACE is required!"
+        Usage
         exit 1
     fi
 
     if [ ! -n "${SUDO_PASSWORD}" ]; then
-        echo "Arguments -p|--SUDO_PASSWORD is required"
+        echo "Arguments -p|--SUDO_PASSWORD is required!"
+        Usage
         exit 1
     fi
 }
@@ -430,7 +433,7 @@ case "$1" in
 
   -h)
     Usage
-    exit 1
+    exit 0
   ;;
 
   *)
