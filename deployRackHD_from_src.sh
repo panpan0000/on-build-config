@@ -6,7 +6,6 @@
 ############################################
 RACKHD_DOCKER_NAME="my/test"
 BASE_IMAGE_URL=http://rackhdci.lss.emc.com/job/Docker_Image_Build/lastSuccessfulBuild/artifact/rackhd_pipeline_docker.tar  # EMC internal Jenkins
-
 #########################################
 #
 #  Usage
@@ -400,20 +399,26 @@ parseArguments(){
         shift
     done
     if [ ! -n "${WORKSPACE}" ]; then
-        echo "Arguments -w|--WORKSPACE is required!"
+        echo "[Error] Arguments -w|--WORKSPACE is required!"
         Usage
         exit 1
     fi
 
     if [ ! -n "${SUDO_PASSWORD}" ]; then
-        echo "Arguments -p|--SUDO_PASSWORD is required!"
+        echo "[Error] Arguments -p|--SUDO_PASSWORD is required!"
         Usage
         exit 1
     fi
 }
 
+
+########################################################
+#
+# Main
+#
+######################################################
 case "$1" in
-  cleanUp)
+  cleanUp|cleanup)
       shift
       parseArguments $@
       cleanUp
@@ -431,7 +436,7 @@ case "$1" in
       exportLogs
   ;;
 
-  -h)
+  -h|--help|help)
     Usage
     exit 0
   ;;

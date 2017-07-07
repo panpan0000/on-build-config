@@ -20,7 +20,7 @@ Usage(){
     echo "  option:"
     echo "    deploy : create a vRack: deploy RackHD and InfraSIM in docker "
     echo "    test   : when if vRack has been deployed. run FIT test"
-    echo "    cleanup: remove the docker images and restore network setting"
+    echo "    cleanUp: remove the docker images and restore network setting"
     echo "    help   : give this help list"
     echo ""
     echo "   Mandatory arguments:"
@@ -42,6 +42,7 @@ SCRIPT=$(readlink -f "$0")
 SCRIPTPATH=$(dirname "$SCRIPT")
 DEPLOY_RACKHD_ARGS=()
 FIT_ARGS=()
+OPERTATION=""
 
 ####################################
 # helpful fucntion: compare two version string
@@ -155,22 +156,21 @@ parseArguments(){
             -c | --VNODE_COUNT )            shift
                                             VNODE_COUNT=$1
                                             ;;
-            * )                             Usage
+            * )                             echo "[Error] Unknown argument $1"
+                                            Usage
                                             exit 1
         esac
         shift
     done
 
-    if [ ! -n "${WORKSPACE}" ]; then
-        echo "Arguments -w|--WORKSPACE is required!"
-        echo "----------------------------------"
+    if [ ! -n "${WORKSPACE}" ] && [ ${OPERATION,,} != "cleanup" ]; then  # ${str,,} is to_lowercase(). available for Bash 4.
+        echo "[Error]Arguments -w|--WORKSPACE is required!"
         Usage
         exit 1
     fi
 
     if [ ! -n "${SUDO_PASSWORD}" ]; then
-        echo "Arguments -p|--SUDO_PASSWORD is required"
-        echo "----------------------------------"
+        echo "[Error]Arguments -p|--SUDO_PASSWORD is required"
         Usage
         exit 1
     fi
@@ -213,8 +213,15 @@ parseArguments(){
     fi
 }
 
+########################################################
+#
+# Main
+#
+#
+####################################################
+OPERATION=$1
 case "$1" in
-  cleanUp)
+  cleanUp|cleanup)
       shift
       parseArguments $@
       cleanUp
@@ -238,6 +245,7 @@ case "$1" in
   ;;
 
   *)
+    echo  "[Error] Unknown operation $1"
     Usage
     exit 1
   ;;
