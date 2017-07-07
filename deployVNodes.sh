@@ -287,7 +287,7 @@ main(){
             ##########################
             # cleanup opertion: parse arguments
             #########################
-            cleanup)
+            cleanup|cleanUp)
                 parseOptions ${argc[@]:1} 
                 cleanUpDockerContainer
                 break
