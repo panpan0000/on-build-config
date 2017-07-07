@@ -6,6 +6,7 @@
 ############################################
 RACKHD_DOCKER_NAME="my/test"
 BASE_IMAGE_URL=http://rackhdci.lss.emc.com/job/Docker_Image_Build/lastSuccessfulBuild/artifact/rackhd_pipeline_docker.tar  # EMC internal Jenkins
+OPERATION=""
 #########################################
 #
 #  Usage
@@ -398,17 +399,19 @@ parseArguments(){
         esac
         shift
     done
-    if [ ! -n "${WORKSPACE}" ]; then
-        echo "[Error] Arguments -w|--WORKSPACE is required!"
+
+    if [ ! -n "${WORKSPACE}" ] && [ ${OPERATION,,} != "cleanup" ]; then  # ${str,,} is to_lowercase(). available for Bash 4.
+        echo "[Error]Arguments -w|--WORKSPACE is required!"
         Usage
         exit 1
     fi
 
     if [ ! -n "${SUDO_PASSWORD}" ]; then
-        echo "[Error] Arguments -p|--SUDO_PASSWORD is required!"
+        echo "[Error]Arguments -p|--SUDO_PASSWORD is required"
         Usage
         exit 1
     fi
+
 }
 
 
@@ -417,6 +420,7 @@ parseArguments(){
 # Main
 #
 ######################################################
+OPERATION=$1
 case "$1" in
   cleanUp|cleanup)
       shift

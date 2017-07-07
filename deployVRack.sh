@@ -92,16 +92,9 @@ check_prerequisite(){
 # Clean Up and Restore
 ###################################
 cleanUp(){
-    local progress=$1
-    if [ ! $progress -lt 2 ]; then
-        ${SCRIPTPATH}/deployVNodes.sh           cleanUp -w $WORKSPACE -p $SUDO_PASSWORD
-    fi
-    if [ ! $progress -lt 1 ]; then
-        ${SCRIPTPATH}/deployRackHD_from_src.sh  cleanUp -w $WORKSPACE -p $SUDO_PASSWORD
-    fi
-    if [ ! $progress -lt 0 ]; then
-        ${SCRIPTPATH}/deployVSwitch.sh          cleanUp -w $WORKSPACE -p $SUDO_PASSWORD
-    fi
+        ${SCRIPTPATH}/deployVNodes.sh           cleanUp -p $SUDO_PASSWORD
+        ${SCRIPTPATH}/deployRackHD_from_src.sh  cleanUp -p $SUDO_PASSWORD
+        ${SCRIPTPATH}/deployVSwitch.sh          cleanUp -p $SUDO_PASSWORD
 
 }
 
@@ -113,18 +106,14 @@ cleanUp(){
 #
 ###################################
 deploy(){
-    local progress=0
 
     check_prerequisite
     
     ${SCRIPTPATH}/deployVSwitch.sh          deploy -p $SUDO_PASSWORD
-    if [ $? -eq 0 ]; then          progress=1;   else exit $?;   fi
 
     ${SCRIPTPATH}/deployRackHD_from_src.sh  deploy -p $SUDO_PASSWORD -w $WORKSPACE "$DEPLOY_RACKHD_ARGS"
-    if [ $? -eq 0 ]; then          progress=2;   else exit $?;   fi
 
     ${SCRIPTPATH}/deployVNodes.sh           deploy -p $SUDO_PASSWORD -c ${VNODE_COUNT}
-    if [ $? -eq 0 ]; then          progress=3;   else exit $?;   fi
 }
 
 ####################################
