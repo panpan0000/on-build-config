@@ -246,7 +246,8 @@ main(){
             -g | --TEST_GROUP )             shift
                                             TEST_GROUP=$1
                                             ;;
-            * )                             Usage
+            * )                             echo "[Error]$0: Unkown Argument: $1"
+                                            Usage
                                             exit 1
         esac
         shift
@@ -288,4 +289,4 @@ main(){
     runTests   
 }
 
-main $@
+main "$@"

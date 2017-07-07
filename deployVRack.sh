@@ -122,7 +122,7 @@ deploy(){
 #
 ###################################
 runTests(){
-    ${SCRIPTPATH}/runFIT.sh -w $WORKSPACE -p $SUDO_PASSWORD -g $TEST_GROUP "$FIT_ARGS"
+    ${SCRIPTPATH}/runFIT.sh -w $WORKSPACE -p $SUDO_PASSWORD -g "$TEST_GROUP" $FIT_ARGS
 }
 
 ###################################################################
@@ -140,7 +140,7 @@ parseArguments(){
                                             SUDO_PASSWORD=$1
                                             ;;
             -g | --TEST_GROUP )             shift
-                                            TEST_GROUP=$1
+                                            TEST_GROUP="$1"
                                             ;;
             -c | --VNODE_COUNT )            shift
                                             VNODE_COUNT=$1
@@ -198,7 +198,7 @@ parseArguments(){
     fi
 
     if [ ! -n "$TEST_GROUP" ]; then
-        TEST_GROUP="-test tests -group smoke"
+        TEST_GROUP=("-test tests -group smoke")
     fi
 }
 
