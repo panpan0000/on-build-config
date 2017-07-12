@@ -57,15 +57,22 @@ node{
                 }
                 Boolean create_tag = false
                 Boolean publish = PUBLISH.toBoolean()
+                echo "DEBUG: before run shareMethod.buildAndPublish currentBuild.result is ${currentBuild.result}!"
                 shareMethod.buildAndPublish(publish, create_tag, repo_dir)
+                echo "DEBUG: before assignment ${currentBuild.result}!"
                 currentBuild.result="SUCCESS"
+                echo "DEBUG: after assignment ${currentBuild.result}!"
                 // trigger unfreeze procedure
                 try {
+                    echo "DEBUG: try 1 = ${currentBuild.result}"
                     build job: env.MERGE_FREEZER_TRIGGER, parameters: [[$class: 'StringParameterValue', name: 'MANUAL', value:"false"],[$class: 'BooleanParameterValue', name: 'FREEZE_OR_UNFREEZE', value:false]]
+                    echo "DEBUG: try 2 = ${currentBuild.result}"
                 } catch (error){
+                    echo "DEBUG: catch = ${currentBuild.result}"
                     echo "Failed to trigger merge freezer!"
                 }
             } finally{
+                echo "DEBUG: in finally = ${currentBuild.result}"
                 shareMethod.sendResult(true, true)
                 if ("${currentBuild.result}" == "FAILURE" || "${currentBuild.result}" == "null"){
                     // trigger freeze procedure
