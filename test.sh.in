@@ -366,8 +366,9 @@ if [ "$RUN_FIT_TEST" == true ] ; then
     setupVirtualEnv
     waitForAPI
     nodesOn &
-    # Doesn't support ova smoke test now
-    # generateSolLog
+
+    generateSolLog
+    vnc_record_start
     # Run tests
     runTests
     # exit venv
