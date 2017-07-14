@@ -356,6 +356,7 @@ if [ "$RUN_FIT_TEST" == true ] ; then
     # Prepare RackHD
     # Forward local host port to ova
     portForwarding localhost
+    trap exportLog SIGINT SIGTERM SIGKILL EXIT
 
     # We setup the virtual-environment here, since once we
     # call "nodesOn", it's a race to get to the first test
