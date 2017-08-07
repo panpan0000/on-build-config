@@ -1,0 +1,23 @@
+@Library('my_library') _
+node{
+    timestamps{
+        def manifest = new pipeline.common.Manifest()
+        def unit_test = new pipeline.rackhd.source_code.UnitTest()
+    
+        manifest.downloadManifest("https://dl.bintray.com/rackhd/binary/master-20170806","master-20170806")
+        stash name: "prgate_manifest", includes: "master-20170806"
+        manifest_dict = [:]
+        manifest_dict["stash_name"] = "prgate_manifest"
+        manifest_dict["stash_path"] = "master-20170806"
+        stage("Unit Test"){
+            def unit_test_branches = [:]
+            unit_test_branches["on-core"] = {
+                unit_test.runTest(manifest_dict, "on-core")
+            }
+            unit_test_branches["on-tasks"] = {
+                unit_test.runTest(manifest_dict, "on-tasks")
+            }
+            parallel unit_test_branches
+        }
+    }
+}
