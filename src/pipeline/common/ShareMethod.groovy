@@ -58,3 +58,9 @@ def occupyAvailableLockedResource(String label_name, ArrayList<String> used_reso
     }
 }
 
+def parseJsonResource(String resource_path){
+    def json_text = libraryResource(resource_path)
+    def props = readJSON text: json_text
+    echo "${props}"
+    return props
+}

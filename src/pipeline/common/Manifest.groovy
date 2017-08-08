@@ -1,4 +1,5 @@
 package pipeline.common
+import java.io.File;
 
 def downloadManifest(String url, String target){
     withCredentials([
@@ -10,6 +11,23 @@ def downloadManifest(String url, String target){
     }
 }
 
+def stashManifest(String manifest_name, String manifest_path){
+    stash name: "$manifest_name", includes: "$manifest_path"
+    manifest_dict = [:]
+    manifest_dict["stash_name"] = "manifest_name"
+    manifest_dict["stash_path"] = "manifest_path"
+    return manifest_dict
+}
+
+def unstashManifest(Map manifest_dict, String target_dir){
+    String manifest_name = manifest_dict["stash_name"]
+    String manifest_path = manifest_dict["stash_path"]
+    dir(target_dir){
+        unstash "$manifest_name"
+    }
+    manifest_path = target_dir + File.separator + manifest_path
+    return manifest_path
+}
 
 def checkoutTargetRepo(String manifest_path, String repo_name, String on_build_config_dir){
     sh """#!/bin/bash -ex
@@ -21,6 +39,7 @@ def checkoutTargetRepo(String manifest_path, String repo_name, String on_build_c
     --force \
     checkout \
     packagerefs
+    
     """
     String repo_dir = "${WORKSPACE}/build-deps/$repo_name"
     return repo_dir
