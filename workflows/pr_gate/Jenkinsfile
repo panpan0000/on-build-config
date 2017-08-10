@@ -3,7 +3,10 @@ node{
     timestamps{
         withEnv([
             "TEST_STACK=${env.TEST_STACK}",
-            "TESTS=${env.TESTS}"
+            "TESTS=${env.TESTS}",
+            "KEEP_FAILURE_ENV=${env.KEEP_FAILURE_ENV}",
+            "KEEP_MINUTES=${env.KEEP_MINUTES}",
+            "KEEP_DOCKER_ON_FAILURE=${env.KEEP_DOCKER_ON_FAILURE}"
         ]){
         def manifest = new pipeline.common.Manifest()
         def unit_test = new pipeline.rackhd.source_code.UnitTest()
@@ -30,10 +33,13 @@ node{
             def function_test_branches = [:]
             ArrayList<String> used_resources = []
             List tests = Arrays.asList(TESTS.split(','))
+            int sleep_mins = Integer.valueOf(KEEP_MINUTES)
+            boolean keep_docker_on_failure = KEEP_DOCKER_ON_FAILURE=='true'
+            boolean keep_failure_env = KEEP_FAILURE_ENV=='true'
             for(int i=0; i<tests.size(); i++){
                 String test_name = tests[i]
                 function_test_branches[test_name] = {
-                    function_test.runTest(TEST_STACK, test_name, used_resources, manifest_dict)
+                    function_test.runTest(TEST_STACK, test_name, used_resources, manifest_dict, keep_docker_on_failure,keep_failure_env,sleep_mins)
                 }
             }
             parallel function_test_branches

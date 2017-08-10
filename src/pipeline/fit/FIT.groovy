@@ -5,6 +5,8 @@ def run(String rackhd_dir, Object fit_configure){
                          passwordVariable: 'SUDO_PASSWORD',
                          usernameVariable: 'SUDO_USER')])
     {
+        String target = fit_configure.getTarget()
+        String name = fit_configure.getName()
         String group = fit_configure.getGroup()
         String stack = fit_configure.getStack()
         String log_level = fit_configure.getLogLevel()
@@ -18,7 +20,7 @@ def run(String rackhd_dir, Object fit_configure){
         } finally{
             dir("$WORKSPACE"){
                 junit 'xunit-reports/*.xml'
-                stash name: "$target$name", includes: 'xunit-reports/*.xml, build-logs/*.log'
+                stash name: "$target$name", includes: 'xunit-reports/*.xml'
             }
         }
     }
