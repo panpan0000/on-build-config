@@ -64,3 +64,24 @@ def parseJsonResource(String resource_path){
     echo "${props}"
     return props
 }
+
+def saveDockerImage(String library_dir, String docker_name, String docker_tag, String target_docker_repo, String target_output_dir){
+    withCredentials([
+        usernamePassword(credentialsId: 'ff7ab8d2-e678-41ef-a46b-dd0e780030e1',
+                         passwordVariable: 'SUDO_PASSWORD',
+                         usernameVariable: 'SUDO_USER'),
+        usernamePassword(credentialsId: 'rackhd-ci-docker-hub',
+                         passwordVariable: 'DOCKERHUB_PASS',
+                         usernameVariable: 'DOCKERHUB_USER')
+    ]){
+        dir("$target_output_dir"){
+            sh """#!/bin/bash -ex
+            current_dir=`pwd`
+            pushd $library_dir/src/pipeline/common
+            ./save_docker.sh -s $SUDO_PASSWORD -u $DOCKERHUB_USER -p $DOCKERHUB_PASS -r $target_docker_repo -n $docker_name -t $docker_tag -o $current_dir
+            popd
+            """
+            archiveArtifacts "*.log"
+        }
+    }
+}

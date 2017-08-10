@@ -10,7 +10,6 @@ node{
         ]){
         def manifest = new pipeline.common.Manifest()
         def unit_test = new pipeline.rackhd.source_code.UnitTest()
-        def function_test = new pipeline.rackhd.source_code.FunctionTest()
 
         manifest.downloadManifest("https://dl.bintray.com/rackhd/binary/master-20170806","master-20170806")
         stash name: "prgate_manifest", includes: "master-20170806"
@@ -30,6 +29,7 @@ node{
         }*/
 
         stage("Function Test"){
+            def function_test = new pipeline.rackhd.source_code.FunctionTest()
             def function_test_branches = [:]
             ArrayList<String> used_resources = []
             List tests = Arrays.asList(TESTS.split(','))

@@ -5,14 +5,14 @@
                 "GROUP":"-test tests -group smoke",
                 "STACK":"docker_local_run",
                 "LOG_LEVEL":"4",
-                "EXTRA_OPTIONS":"",
+                "EXTRA_OPTIONS":"--sm-amqp-use-user guest",
                 "LABEL":"smoke_test"
             },
             "OS_INSTALL":{
                 "GROUP":"-test tests/bootstrap/pr_gate_os_install.py",
                 "STACK":"docker_local_run",
                 "LOG_LEVEL":"4",
-                "EXTRA_OPTIONS":"",
+                "EXTRA_OPTIONS":"--sm-amqp-use-user guest",
                 "LABEL":"os_install"
             }
         },

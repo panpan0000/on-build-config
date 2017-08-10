@@ -18,7 +18,7 @@ def getVNodes(){
 
 def deploy(String library_dir){
     withEnv([
-        "ESXI_HOST=${env.ESXI_HOST}",
+        "ESXI_HOST=${env.ESXI_HOST}", // environment from node configure
         "DATASTORE=${env.DATASTORE}",
         "NIC=${env.NIC}"
     ]){

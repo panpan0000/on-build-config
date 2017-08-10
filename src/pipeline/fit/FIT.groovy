@@ -14,6 +14,7 @@ def run(String rackhd_dir, Object fit_configure){
         try{
             sh """#!/bin/bash -ex
             pushd $rackhd_dir/test
+            ./runFIT.sh -p $SUDO_PASSWORD -g "-test deploy/rackhd_stack_init.py" -s "$stack" -v $log_level -e "$extra_options"
             ./runFIT.sh -p $SUDO_PASSWORD -g "$group" -s "$stack" -v $log_level -e "$extra_options" -w $WORKSPACE
             popd
             """

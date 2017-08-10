@@ -10,7 +10,7 @@ class FitConfigure implements Serializable{
     private int log_level
     private String extra_options
     private String label
-    private String config_path = "pipeline/fit/config.json"
+    private String config_path = "pipeline/fit/stack_config.json"
     private def shareMethod = new ShareMethod()
 
     FitConfigure(stack_type, target, name){
