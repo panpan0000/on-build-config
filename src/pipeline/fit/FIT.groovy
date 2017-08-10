@@ -20,7 +20,6 @@ def run(String rackhd_dir, Object fit_configure){
         } finally{
             dir("$WORKSPACE"){
                 junit 'xunit-reports/*.xml'
-                stash name: "$target$name", includes: 'xunit-reports/*.xml'
             }
         }
     }
@@ -31,9 +30,12 @@ def archiveLogsToTarget(String target_dir, Object fit_configure){
         String target = fit_configure.getTarget()
         String name = fit_configure.getName()
         dir(target_dir){
-            unstash "$target$name"
+            sh """#!/bin/bash
+            set +e
+            mv $WORKSPACE/xunit-reports/*.xml .
+            """
         }
-        archiveArtifacts "$target_dir/*.*, $target_dir/**/*.*"
+        archiveArtifacts "$target_dir/*.*"
     } catch(error){
         echo "[WARNING]Caught error during archive artifact for $name: $error"
     }

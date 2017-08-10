@@ -100,6 +100,7 @@ def runTest(String stack_type, String test_name, ArrayList<String> used_resource
     String test_target = "source_code"
     def fit_configure = new pipeline.fit.FitConfigure(stack_type, test_target, test_name)
     fit_configure.configure()
+    def virtual_node = new pipeline.nodes.VirtualNode()
     String node_name = ""
     String label_name = fit_configure.getLabel()
     try{
@@ -115,16 +116,18 @@ def runTest(String stack_type, String test_name, ArrayList<String> used_resource
                 String target_dir = test_target + "/" + test_name + "[$NODE_NAME]"
                 try{
                     cleanUp(library_dir, ignore_failure)
+                    virtual_node.cleanUp(library_dir, ignore_failure)
                     deploy(library_dir, manifest_path)
-                    //deployNodes()
+                    virtual_node.deploy(library_dir)
                     fit.run(rackhd_dir, fit_configure)
                 } catch(error){
-                    keepFailureEnv(library_dir, keep_docker_on_failure, keep_env_on_failure, keep_minutes, test_target, test_name)
+                    keepEnv(library_dir, keep_docker_on_failure, keep_env_on_failure, keep_minutes, test_target, test_name)
                     error("[ERROR] Failed to run test $test_name against $test_target with error: $error")
                 } finally{
                     archiveLogsToTarget(library_dir, target_dir)
                     ignore_failure = true
                     cleanUp(library_dir, ignore_failure)
+                    virtual_node.cleanUp(library_dir, ignore_failure)
                     fit.archiveLogsToTarget(target_dir, fit_configure)
                     //archiveNodesLogToTarget(library_dir, target_dir)
                     //cleanUpNodes(library_dir)
