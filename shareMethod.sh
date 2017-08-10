@@ -2,27 +2,33 @@
 
 execWithTimeout() {
     set +e
-    # $1 command to execute
-    # $2 timeout
-    # $3 retries on timeout
+    # $1 directory of on-build-config repository
+    # $2 command to execute
+    # $3 timeout
+    # $4 retries on timeout
     if [ -z "${1}" ]; then
+        echo "execWithTimeout() on-build-config directory not specified"
+        exit 2
+    fi
+    if [ -z "${2}" ]; then
         echo "execWithTimeout() Command not specified"
         exit 2
     fi
-    local cmd="/bin/sh -c \"$1\""
+    local on_build_config_dir="$1"
+    local cmd="/bin/sh -c \"$2\""
     #timeout default to 90 seconds
     local timeout=90
     local retry=3
     local result=0
-    if [ ! -z "${2}" ]; then
-        timeout=$2
-    fi
     if [ ! -z "${3}" ]; then
-        retry=$3
+        timeout=$3
+    fi
+    if [ ! -z "${4}" ]; then
+        retry=$4
     fi
     echo "execWithTimeout() retry count is $retry"
     echo "execWithTimeout() timeout is set to $timeout"
-    dir=${WORKSPACE}/build-config/deployment
+    dir=${on_build_config_dir}/deployment
     local time_cmd="${dir}/timeout_cmd.exp"
     if [ ! -x ${time_cmd} ]; then
         chmod a+x ${time_cmd}
