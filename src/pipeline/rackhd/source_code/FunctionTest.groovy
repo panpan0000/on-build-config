@@ -71,16 +71,18 @@ def archiveLogsToTarget(String library_dir, String target_dir){
     }
 }
 
-def keepFailureEnv(String library_dir, boolean keep_docker, boolean keep_env, int keep_minutes, String test_target, String test_name){
+def keepEnv(String library_dir, boolean keep_docker, boolean keep_env, int keep_minutes, String test_target, String test_name){
     String target_dir = test_target + "/" + test_name + "[$NODE_NAME]"
     if(keep_docker) {
-        def docker_tag = JOB_NAME + "_" + test_target + "_" + test_name + ":" + BUILD_NUMBER
-        sh """#!/bin/bash -x
-        set +e
-        pushd $library_dir
-        ./src/pipeline/rackhd/source_code/save_docker.sh/save_docker.sh $docker_tag $target_dir
-        popd
-        """
+        dir(target_dir){
+            def docker_tag = JOB_NAME + "_" + test_target + "_" + test_name + ":" + BUILD_NUMBER
+            sh """#!/bin/bash -x
+            set +e
+            pushd $library_dir
+            ./src/pipeline/rackhd/source_code/save_docker.sh $docker_tag $target_dir
+            popd
+            """
+        }
         archiveArtifacts "$target_dir/*.*"
     }
     if(keep_env){

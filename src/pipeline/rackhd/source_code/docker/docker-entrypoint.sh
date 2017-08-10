@@ -11,7 +11,7 @@ chmod 666 /var/lib/dhcp/dhcpd.leases
 
 service isc-dhcp-server stop
 
-mongod &
+service mongodb start
 sleep 1
 service rabbitmq-server start
 sleep 1
