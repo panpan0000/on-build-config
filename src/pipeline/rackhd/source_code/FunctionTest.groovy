@@ -40,21 +40,29 @@ def runTest(String stack_type, String test_name, ArrayList<String> used_resource
                 boolean ignore_failure = false
                 String target_dir = test_target + "/" + test_name + "[$NODE_NAME]"
                 try{
+                    // clean up rackhd and virtual nodes
                     rackhd_deployer.cleanUp(library_dir, ignore_failure)
                     virtual_node.cleanUp(library_dir, ignore_failure)
+                    // deploy rackhd and virtual nodes
                     rackhd_deployer.deploy(library_dir, manifest_path)
                     virtual_node.deploy(library_dir)
+                    virtual_node.startFetchLogs(library_dir, target_dir)
+                    // run FIT test
                     fit.run(rackhd_dir, fit_configure)
                 } catch(error){
                     keepEnv(library_dir, keep_docker_on_failure, keep_env_on_failure, keep_minutes, test_target, test_name)
                     error("[ERROR] Failed to run test $test_name against $test_target with error: $error")
                 } finally{
+                    // archive rackhd logs
                     rackhd_deployer.archiveLogsToTarget(library_dir, target_dir)
+                    // clean up rackhd and virtual nodes
                     ignore_failure = true
                     rackhd_deployer.cleanUp(library_dir, ignore_failure)
                     virtual_node.cleanUp(library_dir, ignore_failure)
+                    virtual_node.stopFetchLogs(library_dir)
+                    // archive logs of virtual nodes and FIT
+                    virtual_node.archiveLogsToTarget(target_dir)
                     fit.archiveLogsToTarget(target_dir, fit_configure)
-                    //archiveNodesLogToTarget(library_dir, target_dir)
                 }
             }
         }

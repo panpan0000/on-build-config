@@ -84,7 +84,6 @@ case "$1" in
 
   stop)
       shift
-      parseArguments $@
       vncRecordStop
       fetchSolLogStop
   ;;

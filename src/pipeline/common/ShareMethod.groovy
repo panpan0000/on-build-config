@@ -85,3 +85,14 @@ def saveDockerImage(String library_dir, String docker_name, String docker_tag, S
         }
     }
 }
+
+def archiveTargetLogs(String target_dir){
+    try{
+        dir(target_dir){
+            archiveArtifacts "*.*, **/*.*"
+        }
+    } catch(error){
+        echo "[WARNING] Failed to archive logs under $target_dir with error: $error"
+    }
+}
+

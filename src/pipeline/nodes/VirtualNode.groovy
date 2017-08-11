@@ -74,6 +74,36 @@ def cleanUp(String library_dir, boolean ignore_failure){
     }
 }
 
+def startFetchLogs(String library_dir, String target_dir){
+    try{
+        withCredentials([
+             usernamePassword(credentialsId: 'BMC_VNODE_CREDS',
+                             passwordVariable: 'BMC_VNODE_PASSWORD',
+                             usernameVariable: 'BMC_VNODE_USER')
+        ]) {
+            dir(target_dir){
+                sh """#!/bin/bash -ex
+                current_dir=`pwd`
+                pushd $library_dir/deployment
+                ./fetch_vnodes_log.sh start --LOG_DIR "$current_dir" --BMC_ACCOUNT_LIST "$BMC_VNODE_USER:$BMC_VNODE_PASSWORD" --ON_BUILD_CONFIG_DIR $library_dir
+                popd
+                """
+            }
+        }
+    } catch(error){
+        echo "[WARNING] Failed to fetch logs of virtual nodes with error: $error"
+    }
+}
+
+def stopFetchLogs(String library_dir){
+    sh """#!/bin/bash -ex
+    pushd $library_dir/deployment
+    ./fetch_vnodes_log.sh stop
+    popd
+    """
+}
+
 def archiveLogsToTarget(String target_dir){
-    echo "1234"
+    def shareMethod = new pipeline.common.ShareMethod()
+    shareMethod.archiveTargetLogs(target_dir)
 }
