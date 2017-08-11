@@ -96,11 +96,16 @@ def startFetchLogs(String library_dir, String target_dir){
 }
 
 def stopFetchLogs(String library_dir){
-    sh """#!/bin/bash -ex
-    pushd $library_dir/deployment
-    ./fetch_vnodes_log.sh stop
-    popd
-    """
+    try{
+        sh """#!/bin/bash -x
+        set +e
+        pushd $library_dir/deployment
+        ./fetch_vnodes_log.sh stop
+        popd
+        """
+    } catch(error){
+        echo "[WARNING] Failed to stop fetching logs of virtual nodes with error: $error"
+    }
 }
 
 def archiveLogsToTarget(String target_dir){

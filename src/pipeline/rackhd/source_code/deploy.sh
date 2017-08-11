@@ -272,8 +272,9 @@ setupRackHDConfig(){
     echo "*****************************************************************************************************"
     echo "Customize RackHD Config Files to adopt RackHD docker enviroment"
     echo "*****************************************************************************************************"
+    cp ${ON_BUILD_CONFIG_DIR}/resources/src/pipeline/rackhd/source_code/config.json ${ON_BUILD_CONFIG_DIR}/src/pipeline/rackhd/source_code/docker/
     RACKHD_DHCP_HOST_IP=$(ifconfig | awk '/inet addr/{print substr($2,6)}' |grep 172.31.128)
-    sed -i "s/172.31.128.1/${RACKHD_DHCP_HOST_IP}/g" ${ON_BUILD_CONFIG_DIR}/src/pipeline/rackhd/source_code/docker/monorail/config.json
+    sed -i "s/172.31.128.1/${RACKHD_DHCP_HOST_IP}/g" ${ON_BUILD_CONFIG_DIR}/src/pipeline/rackhd/source_code/docker/config.json
 }
 
 

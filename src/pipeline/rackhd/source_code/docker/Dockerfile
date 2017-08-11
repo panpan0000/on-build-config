@@ -3,7 +3,7 @@ FROM rackhd/pipeline:latest
 RUN mkdir /RackHD
 RUN mkdir -p /opt/monorail
 COPY . /RackHD/
-COPY ./monorail /opt/monorail
+COPY ./config.json /opt/monorail
 COPY ./docker-entrypoint.sh /docker-entrypoint.sh
 COPY rackhd.yml /
 
