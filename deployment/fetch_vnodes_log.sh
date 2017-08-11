@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 set +e
 vncRecordStart(){
     pushd ${ON_BUILD_CONFIG_DIR}/deployment

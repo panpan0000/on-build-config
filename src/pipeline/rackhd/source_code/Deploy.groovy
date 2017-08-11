@@ -6,6 +6,9 @@ def deploy(String library_dir, String manifest_path){
     :library_dir: the directory of on-build-config
     :manifest_path: the absolute path of manifest file
     */
+    String rackhd_code_dir = "$WORKSPACE/build-deps"
+    def rackhd_builder = new pipeline.rackhd.source_code.Build()
+    rackhd_builder.build(library_dir, manifest_path, rackhd_code_dir)
     withCredentials([
         usernamePassword(credentialsId: 'ff7ab8d2-e678-41ef-a46b-dd0e780030e1',
                          passwordVariable: 'SUDO_PASSWORD',
@@ -17,7 +20,7 @@ def deploy(String library_dir, String manifest_path){
         sh """#!/bin/bash -ex
         pushd $library_dir/src/pipeline/rackhd/source_code
         # Deploy image-service docker container which is from base image
-        ./deploy.sh deploy -w $WORKSPACE -f $manifest_path -p $SUDO_PASSWORD -b $library_dir -i $WORKSPACE/rackhd_pipeline_docker.tar
+        ./deploy.sh deploy -w $WORKSPACE -s $rackhd_code_dir -p $SUDO_PASSWORD -b $library_dir -i $WORKSPACE/rackhd_pipeline_docker.tar
         popd
         """
     }

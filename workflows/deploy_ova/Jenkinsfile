@@ -1,0 +1,26 @@
+
+
+test_branches [ova_fit] = {
+    fit = new io.common.Fit()
+    ova_test = new ova.FunctionTest()
+    fit.runFIT(ova_test, test_group)
+    
+}
+
+test_branches [ova_os] = {
+    fit = new io.common.Fit()
+    ova_test = new ova.FunctionTest()
+    fit.runFIT(ova_test, test_group)
+
+}
+
+
+test_branches [vagrant_fit] = {
+    fit = new io.common.Fit()
+    ova_test = new ova.FunctionTest()
+    fit.runFIT(ova_test, test_group) {cleanup, deploy, }
+
+}
+
+
+parallel test_branches

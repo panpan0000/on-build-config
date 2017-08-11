@@ -18,14 +18,10 @@ def keepEnv(String library_dir, boolean keep_docker, boolean keep_env, int keep_
 }
 
 def runTest(String stack_type, String test_name, ArrayList<String> used_resources, Map manifest_dict, boolean keep_docker_on_failure, boolean keep_env_on_failure, int keep_minutes){
-    def manifest = new pipeline.common.Manifest()
     def shareMethod = new pipeline.common.ShareMethod()
-    def fit = new pipeline.fit.FIT()
     String test_target = "source_code"
     def fit_configure = new pipeline.fit.FitConfigure(stack_type, test_target, test_name)
     fit_configure.configure()
-    def virtual_node = new pipeline.nodes.VirtualNode()
-    def rackhd_deployer = new pipeline.rackhd.source_code.Deploy()
     String node_name = ""
     String label_name = fit_configure.getLabel()
     try{
@@ -33,12 +29,17 @@ def runTest(String stack_type, String test_name, ArrayList<String> used_resource
             node_name = shareMethod.occupyAvailableLockedResource(label_name, used_resources)
             node(node_name){
                 deleteDir()
+                def manifest = new pipeline.common.Manifest()
+                def fit = new pipeline.fit.FIT()
+                def virtual_node = new pipeline.nodes.VirtualNode()
+                def rackhd_deployer = new pipeline.rackhd.source_code.Deploy()
                 String library_dir = "$WORKSPACE/on-build-config"
                 shareMethod.checkoutOnBuildConfig(library_dir)
                 String manifest_path = manifest.unstashManifest(manifest_dict, "$WORKSPACE")
                 String rackhd_dir = manifest.checkoutTargetRepo(manifest_path, "RackHD", library_dir)
                 boolean ignore_failure = false
                 String target_dir = test_target + "/" + test_name + "[$NODE_NAME]"
+                
                 try{
                     // clean up rackhd and virtual nodes
                     rackhd_deployer.cleanUp(library_dir, ignore_failure)
@@ -55,14 +56,14 @@ def runTest(String stack_type, String test_name, ArrayList<String> used_resource
                 } finally{
                     // archive rackhd logs
                     rackhd_deployer.archiveLogsToTarget(library_dir, target_dir)
+                    fit.archiveLogsToTarget(target_dir, fit_configure)
+                    virtual_node.archiveLogsToTarget(target_dir)
                     // clean up rackhd and virtual nodes
                     ignore_failure = true
                     rackhd_deployer.cleanUp(library_dir, ignore_failure)
                     virtual_node.cleanUp(library_dir, ignore_failure)
                     virtual_node.stopFetchLogs(library_dir)
                     // archive logs of virtual nodes and FIT
-                    virtual_node.archiveLogsToTarget(target_dir)
-                    fit.archiveLogsToTarget(target_dir, fit_configure)
                 }
             }
         }

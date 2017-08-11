@@ -83,9 +83,9 @@ def startFetchLogs(String library_dir, String target_dir){
         ]) {
             dir(target_dir){
                 sh """#!/bin/bash -ex
-                current_dir=`pwd`
+                export current_dir=`pwd`
                 pushd $library_dir/deployment
-                ./fetch_vnodes_log.sh start --LOG_DIR "$current_dir" --BMC_ACCOUNT_LIST "$BMC_VNODE_USER:$BMC_VNODE_PASSWORD" --ON_BUILD_CONFIG_DIR $library_dir
+                ./fetch_vnodes_log.sh start --LOG_DIR $current_dir --BMC_ACCOUNT_LIST "$BMC_VNODE_USER:$BMC_VNODE_PASSWORD" --ON_BUILD_CONFIG_DIR $library_dir
                 popd
                 """
             }
